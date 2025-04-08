@@ -10,3 +10,5 @@ A Streamlit-based web app that helps you discover the cheapest flight connection
 ✈️ Currently powered by publicly available airline APIs, with Ryanair as the first supported provider. Designed to support expansion to additional carriers or APIs.
 
 Great for budget travelers, travel tech enthusiasts, or developers exploring flight data!
+
+Check it @ https://flightconnections.streamlit.app/
