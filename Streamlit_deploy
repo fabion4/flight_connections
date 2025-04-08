@@ -1,0 +1,30 @@
+Opzione 1: [Streamlit Community Cloud (ex Streamlit Sharing)] – Gratuito e super semplice
+🔧 Requisiti:
+Account GitHub
+
+Repository con:
+
+app.py
+
+requirements.txt
+
+eventuali file ausiliari (utils.py, flight_search.py, ecc.)
+
+🧩 Passaggi:
+Crea un repository su GitHub e carica i tuoi file (app.py, utils.py, flight_search.py, ecc.)
+
+Crea un file requirements.txt con le librerie usate. Esempio:
+
+txt
+Copia
+Modifica
+streamlit
+pandas
+requests
+openpyxl
+Vai su https://streamlit.io/cloud
+→ Accedi con GitHub
+→ Clicca “New app”
+→ Seleziona il repo e il file app.py
+
+Aspetta il deployment e… fatto! 🎉
