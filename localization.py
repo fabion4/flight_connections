@@ -1,6 +1,7 @@
 translations = {
     "it": {
         "title": "Trova il volo più economico ✈️",
+        "intro_text": "Questa applicazione ti aiuta a trovare i voli più economici tra due aeroporti. Seleziona gli aeroporti di partenza e arrivo, il mese di partenza e il tempo massimo di scalo per iniziare la ricerca.",
         "select_departure": "Seleziona aeroporto di partenza",
         "select_arrival": "Seleziona aeroporto di arrivo",
         "departure_date": "Seleziona il mese di partenza:",
@@ -13,6 +14,7 @@ translations = {
     },
     "en": {
         "title": "Find the cheapest flight ✈️",
+        "intro_text": "This application helps you find the cheapest flights between two airports. Select the departure and arrival airports, the departure month, and the maximum layover time to start your search.",
         "select_departure": "Select departure airport",
         "select_arrival": "Select arrival airport",
         "departure_date": "Select the departure month:",
@@ -25,6 +27,7 @@ translations = {
     },
     "sc": {
         "title": "Tròva su bigliettu prusòriu ✈️",
+        "intro_text": "Cust'applicatzioni ti agiudat a tròvai is bigliettus prusòrius tra duus aeroportus. Seleziona is aeroportus de partenza e arrivu, su mese de partenza e su tempu màssimu de scalu pro cumintzai sa chirca.",
         "select_departure": "Seleziona aeroportu de partenza",
         "select_arrival": "Seleziona aeroportu de arrivo",
         "departure_date": "Seleziona su mese de partenza:",

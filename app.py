@@ -10,6 +10,8 @@ st.set_page_config(layout="wide")
 language = st.sidebar.selectbox("Select Language / Seleziona Lingua / Seleziona Limba", ["it", "en", "sc"])
 
 st.title(get_translation(language, "title"))
+# Breve spiegazione
+st.markdown(get_translation(language, "intro_text"))
 
 # Retrieve airports
 airports = get_airports()
