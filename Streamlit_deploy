@@ -28,3 +28,12 @@ Vai su https://streamlit.io/cloud
 → Seleziona il repo e il file app.py
 
 Aspetta il deployment e… fatto! 🎉
+
+
+REDEPLOY
+ If you're using Streamlit Community Cloud:
+Go to https://share.streamlit.io/
+Find your app under "Your apps".
+Click the menu (⋮) next to your app.
+Choose "Manage app" > then click "Rerun" or "Clear cache and rerun".
+If needed, click "Settings" and toggle "Always from latest commit".
