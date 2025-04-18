@@ -2,39 +2,74 @@ import requests
 import pandas as pd
 from itertools import product
 from datetime import datetime, timedelta
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Global configuration
+config = {
+    "verify_ssl": False,  # Default value, can be changed
+    "currency": "EUR"
+}
+
+def set_ssl_verification(verify=True):
+    """Set whether SSL certificates should be verified in API requests."""
+    config["verify_ssl"] = verify
+    logger.info(f"SSL verification set to: {verify}")
+
+def set_currency(currency_code="EUR"):
+    """Set currency for price display."""
+    config["currency"] = currency_code
+    logger.info(f"Currency set to: {currency_code}")
 
 def get_airports():
+    """Retrieve the list of active airports from Ryanair API."""
     url = "https://www.ryanair.com/api/views/locate/3/airports/en/active"
-    response = requests.get(url, verify=False)
-    if response.status_code == 200:
-        return response.json()  # Restituisce la lista degli aeroporti
-    else:
+    try:
+        response = requests.get(url, verify=config["verify_ssl"])
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching airports: {e}")
         return []
 
 def get_available_destinations(airport_code):
-    """Recupera le destinazioni disponibili da un dato aeroporto."""
+    """Retrieve available destinations from a given airport."""
     url = f"https://www.ryanair.com/api/views/locate/searchWidget/routes/en/airport/{airport_code}"
-    response = requests.get(url, verify=False)
-    if response.status_code == 200:
+    try:
+        response = requests.get(url, verify=config["verify_ssl"])
+        response.raise_for_status()
         data = response.json()
         return [route["arrivalAirport"]["code"] for route in data]
-    return []
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching destinations from {airport_code}: {e}")
+        return []
 
 def parse_datetime(date_str):
-    """Tenta di convertire una stringa di data in oggetto datetime gestendo diversi formati."""
-    for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%S"):
+    """Convert a date string to datetime object handling different formats."""
+    formats = ["%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"]
+    for fmt in formats:
         try:
             return datetime.strptime(date_str, fmt)
         except ValueError:
             continue
-    raise ValueError(f"Formato data non riconosciuto: {date_str}")
+    logger.error(f"Unrecognized date format: {date_str}")
+    raise ValueError(f"Unrecognized date format: {date_str}")
 
 def get_flight_data(from_code, to_code, date):
-    """Recupera i voli disponibili tra due aeroporti per una data specifica."""
-    url = f"https://www.ryanair.com/api/farfnd/v4/oneWayFares/{from_code}/{to_code}/cheapestPerDay?outboundMonthOfDate={date}&currency=EUR"
-    response = requests.get(url, verify=False)
-    
-    if response.status_code == 200:
+    """Retrieve available flights between two airports for a specific date."""
+    # Check if there's a direct route available
+    destinations = get_available_destinations(from_code)
+    if to_code not in destinations:
+        logger.info(f"No direct route exists from {from_code} to {to_code}")
+        return []
+        
+    url = f"https://www.ryanair.com/api/farfnd/v4/oneWayFares/{from_code}/{to_code}/cheapestPerDay?outboundMonthOfDate={date}&currency={config['currency']}"
+    try:
+        response = requests.get(url, verify=config["verify_ssl"])
+        response.raise_for_status()
         flights = response.json().get("outbound", {}).get("fares", [])
         return [
             {
@@ -46,36 +81,62 @@ def get_flight_data(from_code, to_code, date):
             }
             for f in flights if not f["unavailable"]
         ]
-    
-    return []
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching flights from {from_code} to {to_code}: {e}")
+        return []
 
 def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
-    """Trova tutte le connessioni ottimali tra start_airport e end_airport, includendo voli diretti."""
+    """Find all optimal connections between start_airport and end_airport, including direct flights."""
     
     routes = []
+    logger.info(f"Searching routes from {start_airport} to {end_airport} for {date}")
 
-    # 🔹 1. Controlliamo se esiste un volo diretto
-    direct_flights = get_flight_data(start_airport, end_airport, date)
-    for flight in direct_flights:
-        routes.append({
-            "Connection": f"{flight['from']}-{flight['to']} (Diretto)",
-            "First Leg Departure": flight["departure"].strftime("%Y-%m-%d %H:%M"),
-            "First Leg Arrival": flight["arrival"].strftime("%Y-%m-%d %H:%M"),
-            "Second Leg Departure": "-",
-            "Second Leg Arrival": "-",
-            "Layover (h)": 0,
-            "Total Duration (h)": (flight["arrival"] - flight["departure"]).total_seconds() / 3600,
-            "Total Price (€)": flight["price"]
-        })
+    # Check if the direct route exists before attempting to fetch flights
+    direct_destinations = get_available_destinations(start_airport)
+    if end_airport in direct_destinations:
+        # 🔹 1. Check for direct flights
+        direct_flights = get_flight_data(start_airport, end_airport, date)
+        for flight in direct_flights:
+            routes.append({
+                "Connection": f"{flight['from']}-{flight['to']} (Direct)",
+                "First Leg Departure": flight["departure"].strftime("%Y-%m-%d %H:%M"),
+                "First Leg Arrival": flight["arrival"].strftime("%Y-%m-%d %H:%M"),
+                "Second Leg Departure": "-",
+                "Second Leg Arrival": "-",
+                "Layover (h)": 0,
+                "Total Duration (h)": (flight["arrival"] - flight["departure"]).total_seconds() / 3600,
+                "Total Price (€)": flight["price"]
+            })
+        logger.info(f"Found {len(direct_flights)} direct flights")
+    else:
+        logger.info(f"No direct route from {start_airport} to {end_airport}")
 
-    # 🔹 2. Cerchiamo voli con scalo
+    # 🔹 2. Search for flights with layovers
     first_leg_airports = get_available_destinations(start_airport)
-    second_leg_airports = get_available_destinations(end_airport)
+    second_leg_airports = []
+    
+    # Get all airports that have flights to the destination
+    for airport in get_airports():
+        if airport["iataCode"] != end_airport:  # Exclude the destination itself
+            airport_destinations = get_available_destinations(airport["iataCode"])
+            if end_airport in airport_destinations:
+                second_leg_airports.append(airport["iataCode"])
+    
+    # Find valid connecting airports
     valid_airports = set(first_leg_airports) & set(second_leg_airports)
+    logger.info(f"Found {len(valid_airports)} potential connecting airports")
 
     for via_airport in valid_airports:
+        if via_airport == start_airport or via_airport == end_airport:
+            continue  # Skip if connecting airport is same as start or end
+
         first_leg = get_flight_data(start_airport, via_airport, date)
+        if not first_leg:
+            continue
+            
         second_leg = get_flight_data(via_airport, end_airport, date)
+        if not second_leg:
+            continue
 
         for f1, f2 in product(first_leg, second_leg):
             layover_time = (f2["departure"] - f1["arrival"]).total_seconds() / 3600
@@ -94,5 +155,7 @@ def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
                     "Total Price (€)": total_price
                 })
 
-    # 🔹 3. Creiamo il DataFrame ordinato per prezzo
-    return pd.DataFrame(routes).sort_values(by="Total Price (€)")
+    # 🔹 3. Create sorted DataFrame by price
+    df = pd.DataFrame(routes).sort_values(by="Total Price (€)")
+    logger.info(f"Found total of {len(df)} possible routes")
+    return df
