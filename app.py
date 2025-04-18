@@ -2,10 +2,19 @@ import streamlit as st
 import pandas as pd
 import os
 import json
+import logging
 from datetime import datetime
 from flight_search import find_best_routes, get_airports, set_ssl_verification, set_currency
 from utils import save_to_excel, get_airport_choices, clear_old_files
 from localization import get_translation
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    filename="app.log",
+    filemode="a",
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 # Set page configuration (must be the first Streamlit command)
 st.set_page_config(layout="wide")
@@ -170,6 +179,13 @@ with st.expander(get_translation(language, "feedback_form")):
             with open(feedback_file, "w") as f:
                 json.dump(feedback_data, f, indent=4)
             
+            # Log the feedback
+            logging.info(
+                "User feedback received: Name=%s, Email=%s, Type=%s, Message=%s",
+                feedback_name, feedback_email, feedback_type, feedback_text
+            )
+            
+            # Show success message
             st.success(get_translation(language, "feedback_success"))
         else:
             st.warning(get_translation(language, "feedback_empty"))
