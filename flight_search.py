@@ -3,6 +3,8 @@ import pandas as pd
 from itertools import product
 from datetime import datetime, timedelta
 import logging
+import streamlit as st
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,6 +26,7 @@ def set_currency(currency_code="EUR"):
     config["currency"] = currency_code
     logger.info(f"Currency set to: {currency_code}")
 
+@st.cache_data(ttl=3600)  # Cache valida per 1 ora
 def get_airports():
     """Retrieve the list of active airports from Ryanair API."""
     url = "https://www.ryanair.com/api/views/locate/3/airports/en/active"
@@ -35,6 +38,7 @@ def get_airports():
         logger.error(f"Error fetching airports: {e}")
         return []
 
+@st.cache_data(ttl=3600)  # Cache valida per 1 ora
 def get_available_destinations(airport_code):
     """Retrieve available destinations from a given airport."""
     url = f"https://www.ryanair.com/api/views/locate/searchWidget/routes/en/airport/{airport_code}"
@@ -58,6 +62,7 @@ def parse_datetime(date_str):
     logger.error(f"Unrecognized date format: {date_str}")
     raise ValueError(f"Unrecognized date format: {date_str}")
 
+@st.cache_data(ttl=3600)  # Cache valida per 1 ora
 def get_flight_data(from_code, to_code, date):
     """Retrieve available flights between two airports for a specific date."""
     # Check if there's a direct route available
@@ -85,8 +90,12 @@ def get_flight_data(from_code, to_code, date):
         logger.error(f"Error fetching flights from {from_code} to {to_code}: {e}")
         return []
 
+@st.cache_data(ttl=3600)  # Cache valida per 1 ora
 def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
     """Find all optimal connections between start_airport and end_airport, including direct flights."""
+    
+    # Inizio del timer
+    start_time = time.time()
     
     routes = []
     logger.info(f"Searching routes from {start_airport} to {end_airport} for {date}")
@@ -158,4 +167,10 @@ def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
     # 🔹 3. Create sorted DataFrame by price
     df = pd.DataFrame(routes).sort_values(by="Total Price (€)")
     logger.info(f"Found total of {len(df)} possible routes")
+
+    # Fine del timer
+    end_time = time.time()
+    execution_time = end_time - start_time
+    logger.info(f"Execution time for find_best_routes: {execution_time:.2f} seconds")
+
     return df
