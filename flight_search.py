@@ -90,7 +90,7 @@ def get_flight_data(from_code, to_code, date):
         logger.error(f"Error fetching flights from {from_code} to {to_code}: {e}")
         return []
 
-@st.cache_data(ttl=3600)  # Cache valida per 1 ora
+
 def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
     """Find all optimal connections between start_airport and end_airport, including direct flights."""
     
