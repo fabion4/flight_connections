@@ -124,6 +124,7 @@ def export_to_excel(flights: List[FlightRecord]):
 # ----------------- SERVIZIO FILE STATICI IN LOCALE -----------------
 # Serve il frontend in locale. Su Vercel questa parte viene saltata 
 # perché le regole in vercel.json gestiscono il routing dei file statici.
-public_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "public")
-if os.path.exists(public_path):
-    app.mount("/", StaticFiles(directory=public_path, html=True), name="static")
+root_path = os.path.dirname(os.path.dirname(__file__))
+if os.path.exists(root_path):
+    app.mount("/", StaticFiles(directory=root_path, html=True), name="static")
+
