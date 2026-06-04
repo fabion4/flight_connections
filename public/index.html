@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trova Connessioni Voli Ryanair ✈️</title>
+    <meta name="description" content="Trova il volo più economico combinando voli diretti e voli con scalo Ryanair. Interfaccia moderna, veloce e pulita.">
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-glow"></div>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <span class="airplane-icon">✈️</span>
+                <h1>FlyConnect</h1>
+            </div>
+            <p class="subtitle">Trova le combinazioni di volo più convenienti integrando scali intelligenti</p>
+        </header>
+
+        <!-- Search Form Card -->
+        <main>
+            <section class="search-section">
+                <div class="search-card glass">
+                    <form id="search-form" onsubmit="return false;">
+                        <div class="form-grid">
+                            <!-- Partenza Autocomplete -->
+                            <div class="form-group autocomplete-container" id="dep-container">
+                                <label for="departure-input">Aeroporto di Partenza</label>
+                                <div class="input-wrapper">
+                                    <span class="input-icon">🛫</span>
+                                    <input type="text" id="departure-input" placeholder="Cerca aeroporto o città..." autocomplete="off">
+                                    <button type="button" class="clear-btn" id="clear-dep-btn" style="display: none;">&times;</button>
+                                </div>
+                                <div class="dropdown-list glass" id="departure-dropdown"></div>
+                            </div>
+
+                            <!-- Arrivo Autocomplete -->
+                            <div class="form-group autocomplete-container" id="arr-container">
+                                <label for="arrival-input">Aeroporto di Arrivo</label>
+                                <div class="input-wrapper">
+                                    <span class="input-icon">🛬</span>
+                                    <input type="text" id="arrival-input" placeholder="Cerca aeroporto o città..." autocomplete="off">
+                                    <button type="button" class="clear-btn" id="clear-arr-btn" style="display: none;">&times;</button>
+                                </div>
+                                <div class="dropdown-list glass" id="arrival-dropdown"></div>
+                            </div>
+
+                            <!-- Data di Partenza -->
+                            <div class="form-group">
+                                <label for="departure-date">Data di Partenza</label>
+                                <div class="input-wrapper">
+                                    <span class="input-icon">📅</span>
+                                    <input type="date" id="departure-date" required>
+                                </div>
+                            </div>
+
+                            <!-- Tempo di Scalo -->
+                            <div class="form-group slider-group">
+                                <div class="slider-header">
+                                    <label for="layover-slider">Tempo massimo scalo</label>
+                                    <span id="layover-val">3 giorni</span>
+                                </div>
+                                <input type="range" id="layover-slider" min="1" max="5" value="3" step="1">
+                            </div>
+                        </div>
+
+                        <!-- Cerca Button -->
+                        <div class="form-actions">
+                            <button type="submit" id="search-btn" class="btn-primary">
+                                <span class="btn-text">Cerca Connessioni</span>
+                                <div class="btn-loader" style="display: none;"></div>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="results-section" style="display: none;">
+                <div class="results-header glass">
+                    <div class="results-summary">
+                        <span id="results-count">Trovate 0 connessioni</span>
+                        <span class="divider">|</span>
+                        <span id="results-best-price">Miglior prezzo: €-</span>
+                    </div>
+                    <button id="export-btn" class="btn-success">
+                        <span class="btn-icon">📥</span>
+                        <span>Scarica Excel</span>
+                    </button>
+                </div>
+
+                <!-- Lista Risultati -->
+                <div id="results-list" class="results-list"></div>
+            </section>
+
+            <!-- Loading Skeleton / Spinner State -->
+            <div id="loader-state" class="loader-state" style="display: none;">
+                <div class="spinner"></div>
+                <p>Ricerca dei voli migliori in corso...</p>
+                <p class="loader-sub">Questo processo può richiedere alcuni secondi per scaricare i dati in tempo reale</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="error-state" class="status-card error-card glass" style="display: none;">
+                <span class="status-icon">❌</span>
+                <h3 id="error-title">Nessuna connessione trovata</h3>
+                <p id="error-desc">Prova ad aumentare i giorni di scalo o a selezionare un'altra data.</p>
+            </div>
+
+            <!-- Welcome / Instructions State -->
+            <div id="welcome-state" class="status-card welcome-card glass">
+                <span class="status-icon">💡</span>
+                <h3>Trova il tuo itinerario ideale</h3>
+                <p>Inserisci l'aeroporto di partenza e di arrivo. FlyConnect calcolerà automaticamente le combinazioni ottimali di voli diretti ed eventuali scali con un tempo massimo di attesa flessibile.</p>
+            </div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

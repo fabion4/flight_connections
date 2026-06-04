@@ -1,4 +1,6 @@
-streamlit
-pandas
+fastapi
 requests
+pandas
 openpyxl
+pydantic
+uvicorn
