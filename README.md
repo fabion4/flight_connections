@@ -14,7 +14,7 @@ Formerly built on Streamlit, the project has been updated to a premium HTML/JS/C
 
 ## Links
 * **GitHub Repository:** [https://github.com/fabion4/flight_connections](https://github.com/fabion4/flight_connections)
-* **Vercel Web App:** [https://flight-connections-vibe.vercel.app](https://flight-connections-vibe.vercel.app)
+* **Vercel Web App:** [https://flight-connections-one.vercel.app/](https://flight-connections-one.vercel.app/)
 
 ## Local Run Instructions
 
