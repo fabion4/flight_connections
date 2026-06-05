@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=1.1">
 </head>
 <body>
     <div class="background-glow"></div>
@@ -51,12 +51,24 @@
                                 <div class="dropdown-list glass" id="arrival-dropdown"></div>
                             </div>
 
-                            <!-- Data di Partenza -->
-                            <div class="form-group">
-                                <label for="departure-date">Data di Partenza</label>
+                            <!-- Data di Partenza Custom Picker -->
+                            <div class="form-group autocomplete-container" id="date-container">
+                                <label for="departure-date-input">Data di Partenza</label>
                                 <div class="input-wrapper">
-                                    <span class="input-icon">📅</span>
-                                    <input type="date" id="departure-date" required>
+                                    <span class="input-icon" style="cursor: pointer;" id="date-icon-trigger">📅</span>
+                                    <input type="text" id="departure-date-input" placeholder="Seleziona data..." readonly required>
+                                    <input type="hidden" id="departure-date" required>
+                                </div>
+                                <div class="calendar-dropdown glass" id="calendar-dropdown" style="display: none;">
+                                    <div class="calendar-header">
+                                        <button type="button" class="cal-nav-btn" id="prev-month-btn">&lt;</button>
+                                        <span class="calendar-title" id="calendar-month-year">Mese Anno</span>
+                                        <button type="button" class="cal-nav-btn" id="next-month-btn">&gt;</button>
+                                    </div>
+                                    <div class="calendar-weekdays">
+                                        <div>Lu</div><div>Ma</div><div>Me</div><div>Gi</div><div>Ve</div><div>Sa</div><div>Do</div>
+                                    </div>
+                                    <div class="calendar-days" id="calendar-days-grid"></div>
                                 </div>
                             </div>
 
@@ -121,6 +133,6 @@
             </div>
         </main>
     </div>
-    <script src="app.js"></script>
+    <script src="app.js?v=1.1"></script>
 </body>
 </html>

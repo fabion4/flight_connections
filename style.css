@@ -116,10 +116,16 @@ header .subtitle {
 }
 
 /* Card di Ricerca */
+.search-section {
+    position: relative;
+    z-index: 10;
+}
+
 .search-card {
     padding: 2rem;
     margin-bottom: 2rem;
     position: relative;
+    z-index: 100; /* Solleva la card intera sopra al welcome-state e risultati */
     overflow: visible; /* per non tagliare le tendine dell'autocomplete */
 }
 
@@ -194,6 +200,13 @@ header .subtitle {
 /* Autocomplete Dropdown */
 .autocomplete-container {
     position: relative;
+    z-index: 1; /* Di base basso */
+}
+
+/* Quando il contenitore ha all'interno una tendina aperta o ha il focus, aumenta lo z-index */
+.autocomplete-container:focus-within,
+.autocomplete-container.active-picker {
+    z-index: 50; /* Supera gli altri form-group adiacenti */
 }
 
 .dropdown-list {
@@ -203,12 +216,12 @@ header .subtitle {
     right: 0;
     max-height: 250px;
     overflow-y: auto;
-    z-index: 100;
+    z-index: 99999; /* Valore altissimo per stare sopra a tutto il resto della pagina */
     display: none;
     border-radius: 10px;
-    background: rgba(17, 21, 32, 0.95);
+    background: rgba(17, 21, 32, 0.98);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
 }
 
 .dropdown-item {
@@ -241,6 +254,104 @@ header .subtitle {
     font-size: 0.75rem;
     font-weight: bold;
     color: var(--accent-indigo);
+}
+
+/* Stili Calendario Custom */
+.calendar-dropdown {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 0;
+    width: 280px;
+    padding: 1rem;
+    z-index: 9999; /* z-index molto alto per sovrapporsi a tutto il resto */
+    background: rgba(17, 21, 32, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    border-radius: 12px;
+    user-select: none;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.calendar-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #fff;
+}
+
+.cal-nav-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.cal-nav-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: var(--accent-indigo);
+}
+
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    text-align: center;
+}
+
+.calendar-day {
+    font-size: 0.85rem;
+    padding: 0.4rem 0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    color: #d1d5db;
+}
+
+.calendar-day:hover:not(.disabled) {
+    background: rgba(99, 102, 241, 0.2);
+    color: #fff;
+}
+
+.calendar-day.today {
+    border: 1px solid var(--accent-indigo);
+}
+
+.calendar-day.selected {
+    background: var(--accent-indigo) !important;
+    color: #fff !important;
+    font-weight: bold;
+}
+
+.calendar-day.disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+
+.calendar-day.empty {
+    cursor: default;
 }
 
 /* Slider Tempo di Scalo */
@@ -367,6 +478,20 @@ header .subtitle {
     flex-direction: column;
     align-items: center;
     gap: 1rem;
+    position: relative;
+    z-index: 1; /* z-index basso per stare sotto le tendine di ricerca */
+}
+
+/* Loader Principale */
+.loader-state {
+    padding: 3rem 2rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    z-index: 1; /* z-index basso */
 }
 
 .status-icon {

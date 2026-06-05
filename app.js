@@ -14,6 +14,14 @@ const arrDropdown = document.getElementById("arrival-dropdown");
 const clearArrBtn = document.getElementById("clear-arr-btn");
 
 const dateInput = document.getElementById("departure-date");
+const dateInputText = document.getElementById("departure-date-input");
+const dateIconTrigger = document.getElementById("date-icon-trigger");
+const calendarDropdown = document.getElementById("calendar-dropdown");
+const calendarMonthYear = document.getElementById("calendar-month-year");
+const calendarDaysGrid = document.getElementById("calendar-days-grid");
+const prevMonthBtn = document.getElementById("prev-month-btn");
+const nextMonthBtn = document.getElementById("next-month-btn");
+
 const layoverSlider = document.getElementById("layover-slider");
 const layoverVal = document.getElementById("layover-val");
 
@@ -30,13 +38,21 @@ const resultsCount = document.getElementById("results-count");
 const bestPriceSpan = document.getElementById("results-best-price");
 const exportBtn = document.getElementById("export-btn");
 
+// Stato del Calendario Custom
+let calendarCurrentDate = new Date(); // Data correntemente visualizzata sul calendario
+let selectedDate = null; // Data selezionata dall'utente
+
 // Inizializzazione della Pagina
 document.addEventListener("DOMContentLoaded", () => {
     // Imposta la data di default a domani
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    dateInput.value = tomorrow.toISOString().split("T")[0];
-    dateInput.min = new Date().toISOString().split("T")[0]; // Impedisce date passate
+    
+    // Imposta lo stato iniziale
+    selectedDate = tomorrow;
+    calendarCurrentDate = new Date(tomorrow);
+    
+    updateDateInputFields(tomorrow);
 
     // Carica gli aeroporti dal backend
     loadAirports();
@@ -51,10 +67,25 @@ document.addEventListener("DOMContentLoaded", () => {
     setupAutocomplete(depInput, depDropdown, clearDepBtn, (code) => { selectedDepCode = code; });
     setupAutocomplete(arrInput, arrDropdown, clearArrBtn, (code) => { selectedArrCode = code; });
 
+    // Gestione Eventi Calendario Custom
+    dateInputText.addEventListener("click", toggleCalendar);
+    dateIconTrigger.addEventListener("click", toggleCalendar);
+    
+    prevMonthBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        changeMonth(-1);
+    });
+    
+    nextMonthBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        changeMonth(1);
+    });
+
     // Click al di fuori dei dropdown per chiuderli
     document.addEventListener("click", (e) => {
         if (!e.target.closest("#dep-container")) hideDropdown(depDropdown);
         if (!e.target.closest("#arr-container")) hideDropdown(arrDropdown);
+        if (!e.target.closest("#date-container")) hideCalendar();
     });
 
     // Invio form ricerca
@@ -63,6 +94,107 @@ document.addEventListener("DOMContentLoaded", () => {
     // Esportazione Excel
     exportBtn.addEventListener("click", handleExport);
 });
+
+// Aggiorna i valori nei campi input reali e visibili
+function updateDateInputFields(date) {
+    const formattedYMD = date.toISOString().split("T")[0];
+    dateInput.value = formattedYMD;
+    
+    // Formato visibile all'utente: DD/MM/YYYY
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    dateInputText.value = `${day}/${month}/${year}`;
+}
+
+// Funzioni Calendario Custom
+function toggleCalendar(e) {
+    e.stopPropagation();
+    const dateContainer = document.getElementById("date-container");
+    if (calendarDropdown.style.display === "none") {
+        renderCalendar();
+        calendarDropdown.style.display = "block";
+        dateContainer.classList.add("active-picker");
+    } else {
+        hideCalendar();
+    }
+}
+
+function hideCalendar() {
+    calendarDropdown.style.display = "none";
+    const dateContainer = document.getElementById("date-container");
+    if (dateContainer) {
+        dateContainer.classList.remove("active-picker");
+    }
+}
+
+function changeMonth(direction) {
+    calendarCurrentDate.setMonth(calendarCurrentDate.getMonth() + direction);
+    renderCalendar();
+}
+
+function renderCalendar() {
+    const year = calendarCurrentDate.getFullYear();
+    const month = calendarCurrentDate.getMonth();
+    
+    const monthNames = [
+        "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+        "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"
+    ];
+    
+    calendarMonthYear.textContent = `${monthNames[month]} ${year}`;
+    
+    calendarDaysGrid.innerHTML = "";
+    
+    // Calcola il primo giorno del mese (0 = Domenica, 1 = Lunedì... 6 = Sabato)
+    let firstDayIndex = new Date(year, month, 1).getDay();
+    // Conversione a settimana che inizia da Lunedì (0 = Lunedì ... 6 = Domenica)
+    firstDayIndex = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+    
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    
+    // Giorni vuoti prima del primo giorno del mese
+    for (let i = 0; i < firstDayIndex; i++) {
+        const emptyDiv = document.createElement("div");
+        emptyDiv.className = "calendar-day empty";
+        calendarDaysGrid.appendChild(emptyDiv);
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Genera i giorni
+    for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
+        const dayDiv = document.createElement("div");
+        dayDiv.className = "calendar-day";
+        dayDiv.textContent = dayNum;
+        
+        const thisDate = new Date(year, month, dayNum);
+        
+        // Verifica se la data è passata (disabilitata)
+        if (thisDate < today) {
+            dayDiv.classList.add("disabled");
+        } else {
+            // Oggi
+            if (thisDate.getTime() === today.getTime()) {
+                dayDiv.classList.add("today");
+            }
+            // Selezionato
+            if (selectedDate && thisDate.getTime() === selectedDate.getTime()) {
+                dayDiv.classList.add("selected");
+            }
+            
+            dayDiv.addEventListener("click", (e) => {
+                e.stopPropagation();
+                selectedDate = thisDate;
+                updateDateInputFields(thisDate);
+                hideCalendar();
+            });
+        }
+        
+        calendarDaysGrid.appendChild(dayDiv);
+    }
+}
 
 // Funzione per caricare gli aeroporti
 async function loadAirports() {
