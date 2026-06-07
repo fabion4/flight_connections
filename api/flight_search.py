@@ -59,7 +59,7 @@ def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
     """Trova tutte le connessioni ottimali tra start_airport e end_airport, includendo voli diretti."""
     
     routes = []
-
+ 
     # 🔹 1. Controlliamo se esiste un volo diretto
     direct_flights = get_flight_data(start_airport, end_airport, date)
     for flight in direct_flights:
@@ -77,20 +77,20 @@ def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
             "Total Duration (h)": (flight["arrival"] - flight["departure"]).total_seconds() / 3600,
             "Total Price (€)": flight["price"]
         })
-
+ 
     # 🔹 2. Cerchiamo voli con scalo
     first_leg_airports = get_available_destinations(start_airport)
     second_leg_airports = get_available_destinations(end_airport)
     valid_airports = set(first_leg_airports) & set(second_leg_airports)
-
+ 
     for via_airport in valid_airports:
         first_leg = get_flight_data(start_airport, via_airport, date)
         second_leg = get_flight_data(via_airport, end_airport, date)
-
+ 
         for f1, f2 in product(first_leg, second_leg):
             layover_time = (f2["departure"] - f1["arrival"]).total_seconds() / 3600
             total_duration = (f2["arrival"] - f1["departure"]).total_seconds() / 3600
-
+ 
             if 0 < layover_time <= max_layover_days * 24:
                 total_price = f1["price"] + f2["price"]
                 routes.append({
@@ -107,7 +107,7 @@ def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
                     "Total Duration (h)": round(total_duration, 1),
                     "Total Price (€)": total_price
                 })
-
+ 
     # 🔹 3. Creiamo il DataFrame ordinato per prezzo
     if not routes:
         return pd.DataFrame()

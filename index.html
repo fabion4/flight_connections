@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.3">
+    <link rel="stylesheet" href="style.css?v=1.5">
 </head>
 <body>
     <div class="background-glow"></div>
@@ -127,6 +127,19 @@
                     </button>
                 </div>
 
+                <!-- Filtro Compagnie -->
+                <div id="carrier-filter-panel" class="carrier-filter-panel glass" style="display: none;">
+                    <div class="carrier-filter-header">
+                        <span class="carrier-filter-title">🏢 Filtra per compagnia</span>
+                        <div class="carrier-filter-actions">
+                            <span id="filtered-count" class="filtered-count-badge"></span>
+                            <button id="select-all-carriers" class="carrier-action-btn">Seleziona tutti</button>
+                            <button id="deselect-all-carriers" class="carrier-action-btn">Deseleziona tutti</button>
+                        </div>
+                    </div>
+                    <div id="carrier-chips" class="carrier-chips"></div>
+                </div>
+
                 <!-- Lista Risultati -->
                 <div id="results-list" class="results-list"></div>
             </section>
@@ -153,6 +166,6 @@
             </div>
         </main>
     </div>
-    <script src="app.js?v=1.3"></script>
+    <script src="app.js?v=1.5"></script>
 </body>
 </html>

@@ -4,6 +4,9 @@ let selectedDepCode = "";
 let selectedArrCode = "";
 let currentResults = [];
 
+// Stato del Filtro Compagnie
+let activeCarriers = new Set(); // Set dei carrier attualmente selezionati
+
 // Elementi DOM
 const depInput = document.getElementById("departure-input");
 const depDropdown = document.getElementById("departure-dropdown");
@@ -37,6 +40,13 @@ const resultsList = document.getElementById("results-list");
 const resultsCount = document.getElementById("results-count");
 const bestPriceSpan = document.getElementById("results-best-price");
 const exportBtn = document.getElementById("export-btn");
+
+// Elementi DOM Filtro Compagnie
+const carrierFilterPanel = document.getElementById("carrier-filter-panel");
+const carrierChipsContainer = document.getElementById("carrier-chips");
+const filteredCountBadge = document.getElementById("filtered-count");
+const selectAllBtn = document.getElementById("select-all-carriers");
+const deselectAllBtn = document.getElementById("deselect-all-carriers");
 
 // Stato del Calendario Custom
 let calendarCurrentDate = new Date(); // Data correntemente visualizzata sul calendario
@@ -96,6 +106,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Esportazione Excel
     exportBtn.addEventListener("click", handleExport);
+
+    // Filtro compagnie — Seleziona tutto / Deseleziona tutto
+    selectAllBtn.addEventListener("click", () => {
+        activeCarriers = new Set(getAllCarriers());
+        updateChipsUI();
+        applyCarrierFilter();
+    });
+
+    deselectAllBtn.addEventListener("click", () => {
+        activeCarriers.clear();
+        updateChipsUI();
+        applyCarrierFilter();
+    });
 });
 
 // Aggiorna i valori nei campi input reali e visibili
@@ -402,6 +425,7 @@ async function handleSearch() {
     errorState.style.display = "none";
     resultsSection.style.display = "none";
     loaderState.style.display = "flex";
+    resetCarrierFilter(); // Reset filtro compagnie ad ogni nuova ricerca
     
     // Disabilita pulsante
     searchBtn.disabled = true;
@@ -439,14 +463,149 @@ async function handleSearch() {
     }
 }
 
+// ─── FILTRO COMPAGNIE ───────────────────────────────────────────────────────
+
+/** Estrae tutti i carrier unici dalla lista completa dei risultati */
+function getAllCarriers() {
+    const carriers = new Set();
+    currentResults.forEach(r => {
+        if (r["First Leg Carrier"] && r["First Leg Carrier"] !== "-") carriers.add(r["First Leg Carrier"]);
+        if (r["Second Leg Carrier"] && r["Second Leg Carrier"] !== "-") carriers.add(r["Second Leg Carrier"]);
+    });
+    return [...carriers].sort();
+}
+
+/** Conta quanti risultati sono visibili con il filtro corrente */
+function countFilteredResults() {
+    return currentResults.filter(r => routeMatchesFilter(r)).length;
+}
+
+/** Ritorna true se tutti i carrier del risultato sono nel set attivo */
+function routeMatchesFilter(route) {
+    const c1 = route["First Leg Carrier"];
+    const c2 = route["Second Leg Carrier"];
+    
+    // Se il primo carrier è presente ma non attivo, escludi la rotta
+    if (c1 && c1 !== "-" && !activeCarriers.has(c1)) return false;
+    
+    // Se il secondo carrier è presente ma non attivo, escludi la rotta
+    if (c2 && c2 !== "-" && !activeCarriers.has(c2)) return false;
+    
+    return true;
+}
+
+/** Costruisce i chip delle compagnie e mostra il pannello filtro */
+function buildCarrierFilter() {
+    const carriers = getAllCarriers();
+    if (carriers.length <= 1) {
+        // Con una sola compagnia il filtro non serve
+        carrierFilterPanel.style.display = "none";
+        return;
+    }
+
+    // Seleziona tutti di default
+    activeCarriers = new Set(carriers);
+
+    // Svuota e ricostruisce i chip
+    carrierChipsContainer.innerHTML = "";
+    carriers.forEach(carrier => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "carrier-chip active";
+        chip.dataset.carrier = carrier;
+
+        // Conta i voli per questa compagnia
+        const count = currentResults.filter(r =>
+            r["First Leg Carrier"] === carrier || r["Second Leg Carrier"] === carrier
+        ).length;
+
+        chip.innerHTML = `<span class="chip-name">${carrier}</span><span class="chip-count">${count}</span>`;
+        chip.addEventListener("click", () => toggleCarrier(carrier, chip));
+        carrierChipsContainer.appendChild(chip);
+    });
+
+    updateFilteredCount();
+    carrierFilterPanel.style.display = "block";
+}
+
+/** Attiva/disattiva un singolo carrier */
+function toggleCarrier(carrier, chipEl) {
+    if (activeCarriers.has(carrier)) {
+        activeCarriers.delete(carrier);
+        chipEl.classList.remove("active");
+        chipEl.classList.add("inactive");
+    } else {
+        activeCarriers.add(carrier);
+        chipEl.classList.remove("inactive");
+        chipEl.classList.add("active");
+    }
+    updateFilteredCount();
+    applyCarrierFilter();
+}
+
+/** Sincronizza lo stato visivo di tutti i chip con activeCarriers */
+function updateChipsUI() {
+    carrierChipsContainer.querySelectorAll(".carrier-chip").forEach(chip => {
+        const carrier = chip.dataset.carrier;
+        if (activeCarriers.has(carrier)) {
+            chip.classList.add("active");
+            chip.classList.remove("inactive");
+        } else {
+            chip.classList.remove("active");
+            chip.classList.add("inactive");
+        }
+    });
+    updateFilteredCount();
+}
+
+/** Aggiorna il badge con il conteggio dei risultati filtrati */
+function updateFilteredCount() {
+    const visible = countFilteredResults();
+    const total = currentResults.length;
+    if (visible === total) {
+        filteredCountBadge.textContent = `${total} risultat${total === 1 ? "o" : "i"}`;
+        filteredCountBadge.className = "filtered-count-badge";
+    } else {
+        filteredCountBadge.textContent = `${visible} / ${total} risultat${total === 1 ? "o" : "i"}`;
+        filteredCountBadge.className = "filtered-count-badge filtered-active";
+    }
+}
+
+/** Applica il filtro corrente e ridisegna la lista */
+function applyCarrierFilter() {
+    const filtered = currentResults.filter(r => routeMatchesFilter(r));
+    renderResults(filtered, /* updateFilter= */ false);
+    updateFilteredCount();
+}
+
+/** Nasconde e resetta il pannello filtro */
+function resetCarrierFilter() {
+    activeCarriers.clear();
+    carrierChipsContainer.innerHTML = "";
+    carrierFilterPanel.style.display = "none";
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 // Rendering dei Risultati
-function renderResults(routes) {
+// updateFilter=true (default) → ricostruisce il pannello carrier; false → solo aggiorna la lista
+function renderResults(routes, updateFilter = true) {
     resultsList.innerHTML = "";
     
     // Aggiorna le statistiche in alto
     resultsCount.textContent = `Trovate ${routes.length} connession${routes.length === 1 ? "e" : "i"}`;
-    const bestPrice = routes[0]["Total Price (€)"];
-    bestPriceSpan.textContent = `Miglior prezzo: €${bestPrice.toFixed(2)}`;
+    if (routes.length > 0) {
+        const bestPrice = routes[0]["Total Price (€)"];
+        bestPriceSpan.textContent = `Miglior prezzo: €${bestPrice.toFixed(2)}`;
+    } else {
+        bestPriceSpan.textContent = "Miglior prezzo: €-";
+    }
+
+    // Costruisce/aggiorna il pannello filtro SOLO al primo render (non durante i re-render da filtro)
+    if (updateFilter) {
+        buildCarrierFilter();
+    }
+
 
     routes.forEach(route => {
         const isDirect = route["Connection"].includes("Diretto");

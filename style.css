@@ -955,3 +955,156 @@ header .subtitle {
         gap: 1rem;
     }
 }
+
+/* ─── Filtro Compagnie ────────────────────────────────────────────────────── */
+
+.carrier-filter-panel {
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 14px;
+    animation: fadeSlideDown 0.35s ease;
+}
+
+@keyframes fadeSlideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.carrier-filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.carrier-filter-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.3px;
+}
+
+.carrier-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+/* Badge contatore (es. "12 risultati" o "5 / 12 risultati") */
+.filtered-count-badge {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    transition: all 0.3s;
+}
+
+/* Quando il filtro è attivo, il badge si illumina in ambra */
+.filtered-count-badge.filtered-active {
+    color: var(--accent-amber);
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+/* Mini pulsanti "Seleziona tutti" / "Deseleziona tutti" */
+.carrier-action-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-stack);
+}
+
+.carrier-action-btn:hover {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.35);
+    color: #c7d2fe;
+}
+
+/* Contenitore chip compagnie */
+.carrier-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+/* Chip singola compagnia */
+.carrier-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.9rem;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.22s ease;
+    font-family: var(--font-stack);
+    user-select: none;
+}
+
+/* Chip ATTIVA (compagnia selezionata) */
+.carrier-chip.active {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.15));
+    border-color: rgba(99, 102, 241, 0.5);
+    color: #c7d2fe;
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.12);
+}
+
+.carrier-chip.active:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.25));
+    border-color: rgba(99, 102, 241, 0.75);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.2);
+}
+
+/* Chip INATTIVA (compagnia deselezionata) */
+.carrier-chip.inactive {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    opacity: 0.55;
+}
+
+.carrier-chip.inactive:hover {
+    opacity: 0.8;
+    border-color: rgba(255, 255, 255, 0.18);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+/* Badge col numero di voli per carrier */
+.chip-count {
+    background: rgba(255, 255, 255, 0.12);
+    color: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.1rem 0.45rem;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.carrier-chip.active .chip-count {
+    background: rgba(99, 102, 241, 0.3);
+}
+
+/* Responsive filtro */
+@media (max-width: 600px) {
+    .carrier-filter-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
