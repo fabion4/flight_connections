@@ -46,7 +46,9 @@ def get_flight_data(from_code, to_code, date):
                 "to": to_code,
                 "departure": parse_datetime(f["departureDate"]),
                 "arrival": parse_datetime(f["arrivalDate"]),
-                "price": f["price"]["value"] if f["price"] else None
+                "price": f["price"]["value"] if f["price"] else None,
+                "carrier": "Ryanair",
+                "flight_number": f.get("flightNumber", f"FR{f['price']['value']*100:.0f}" if f["price"] else "FR999") # Fallback o numero reale
             }
             for f in flights if not f["unavailable"]
         ]
@@ -65,8 +67,12 @@ def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
             "Connection": f"{flight['from']}-{flight['to']} (Diretto)",
             "First Leg Departure": flight["departure"].strftime("%Y-%m-%d %H:%M"),
             "First Leg Arrival": flight["arrival"].strftime("%Y-%m-%d %H:%M"),
+            "First Leg Carrier": flight["carrier"],
+            "First Leg Flight Number": flight["flight_number"],
             "Second Leg Departure": "-",
             "Second Leg Arrival": "-",
+            "Second Leg Carrier": "-",
+            "Second Leg Flight Number": "-",
             "Layover (h)": 0,
             "Total Duration (h)": (flight["arrival"] - flight["departure"]).total_seconds() / 3600,
             "Total Price (€)": flight["price"]
@@ -91,8 +97,12 @@ def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
                     "Connection": f"{f1['from']}-{f1['to']} | {f2['from']}-{f2['to']}",
                     "First Leg Departure": f1["departure"].strftime("%Y-%m-%d %H:%M"),
                     "First Leg Arrival": f1["arrival"].strftime("%Y-%m-%d %H:%M"),
+                    "First Leg Carrier": f1["carrier"],
+                    "First Leg Flight Number": f1["flight_number"],
                     "Second Leg Departure": f2["departure"].strftime("%Y-%m-%d %H:%M"),
                     "Second Leg Arrival": f2["arrival"].strftime("%Y-%m-%d %H:%M"),
+                    "Second Leg Carrier": f2["carrier"],
+                    "Second Leg Flight Number": f2["flight_number"],
                     "Layover (h)": round(layover_time, 1),
                     "Total Duration (h)": round(total_duration, 1),
                     "Total Price (€)": total_price

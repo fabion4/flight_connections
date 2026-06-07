@@ -4,3 +4,5 @@ pandas
 openpyxl
 pydantic
 uvicorn
+python-dotenv
+duffel-api

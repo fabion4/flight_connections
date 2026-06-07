@@ -646,6 +646,24 @@ header .subtitle {
     line-height: 1.2;
 }
 
+.carrier-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-indigo);
+    background: rgba(99, 102, 241, 0.1);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    margin-top: 0.25rem;
+    display: inline-block;
+    width: max-content;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.carrier-badge small {
+    color: var(--text-muted);
+    margin-left: 0.25rem;
+}
+
 .airport-info .city {
     font-size: 0.85rem;
     color: var(--text-muted);
@@ -819,5 +837,121 @@ header .subtitle {
     .btn-success {
         width: 100%;
         justify-content: center;
+    }
+}
+
+/* Dashboard di Stato Connettività */
+.status-dashboard-section {
+    margin-bottom: 1.5rem;
+}
+
+.status-dashboard {
+    display: flex;
+    justify-content: space-around;
+    gap: 1.5rem;
+    padding: 1.25rem;
+    border-radius: 12px;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    flex: 1;
+    min-width: 200px;
+    padding: 0.25rem 0.5rem;
+}
+
+.status-led {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.led-unknown {
+    background-color: #9ca3af;
+    box-shadow: 0 0 8px #9ca3af;
+}
+
+.led-active {
+    background-color: #10b981;
+    box-shadow: 0 0 10px #10b981;
+    animation: led-pulse-active 2s infinite ease-in-out;
+}
+
+.led-warning {
+    background-color: #f59e0b;
+    box-shadow: 0 0 10px #f59e0b;
+    animation: led-pulse-warning 2s infinite ease-in-out;
+}
+
+.led-error {
+    background-color: #ef4444;
+    box-shadow: 0 0 10px #ef4444;
+}
+
+.led-inactive {
+    background-color: #6b7280;
+    box-shadow: none;
+    opacity: 0.6;
+}
+
+@keyframes led-pulse-active {
+    0%, 100% { box-shadow: 0 0 6px rgba(16, 185, 129, 0.4); }
+    50% { box-shadow: 0 0 12px rgba(16, 185, 129, 0.9); }
+}
+
+@keyframes led-pulse-warning {
+    0%, 100% { box-shadow: 0 0 6px rgba(245, 158, 11, 0.4); }
+    50% { box-shadow: 0 0 12px rgba(245, 158, 11, 0.9); }
+}
+
+.status-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.status-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.mode-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.mode-badge.live {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.mode-badge.sandbox {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+@media (max-width: 600px) {
+    .status-dashboard {
+        flex-direction: column;
+        gap: 1rem;
     }
 }

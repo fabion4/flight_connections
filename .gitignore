@@ -22,3 +22,8 @@ voli_trovati.xlsx
 
 # Cartelle temporanee di Vercel
 .vercel/
+
+# File di configurazione d'ambiente privati
+.env
+.env.*
+*.local

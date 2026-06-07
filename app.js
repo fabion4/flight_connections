@@ -57,6 +57,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Carica gli aeroporti dal backend
     loadAirports();
 
+    // Carica lo stato del sistema (health status)
+    loadSystemStatus();
+
     // Eventi Slider
     layoverSlider.addEventListener("input", (e) => {
         const val = e.target.value;
@@ -208,48 +211,127 @@ async function loadAirports() {
     }
 }
 
+// Funzione per caricare lo stato del sistema (Ryanair e Duffel API)
+async function loadSystemStatus() {
+    const ledRyanair = document.getElementById("led-ryanair");
+    const ryanairDesc = document.getElementById("ryanair-desc");
+    const ledDuffel = document.getElementById("led-duffel");
+    const duffelDesc = document.getElementById("duffel-desc");
+    const duffelModeBadge = document.getElementById("duffel-mode-badge");
+
+    try {
+        const response = await fetch("/api/status");
+        if (!response.ok) throw new Error("Errore nel caricamento dello stato API");
+        const status = await response.json();
+
+        // 1. Aggiorna Ryanair
+        ledRyanair.className = "status-led"; // Reset classes
+        if (status.ryanair.status === "active") {
+            ledRyanair.classList.add("led-active");
+            ryanairDesc.textContent = status.ryanair.message;
+        } else {
+            ledRyanair.classList.add("led-error");
+            ryanairDesc.textContent = status.ryanair.message || "Errore di connessione";
+        }
+
+        // 2. Aggiorna Duffel
+        ledDuffel.className = "status-led"; // Reset classes
+        if (status.duffel.status === "active") {
+            ledDuffel.classList.add("led-active");
+            duffelDesc.textContent = status.duffel.message;
+        } else if (status.duffel.status === "inactive") {
+            ledDuffel.classList.add("led-inactive");
+            duffelDesc.textContent = status.duffel.message;
+        } else if (status.duffel.status === "error" && status.duffel.message.includes("403")) {
+            ledDuffel.classList.add("led-warning"); // Giallo per problemi di permessi
+            duffelDesc.textContent = status.duffel.message;
+        } else {
+            ledDuffel.classList.add("led-error");
+            duffelDesc.textContent = status.duffel.message || "Errore API Duffel";
+        }
+
+        // Badge della modalità Duffel (Live/Sandbox)
+        if (status.duffel.mode && status.duffel.mode !== "none") {
+            duffelModeBadge.textContent = status.duffel.mode;
+            duffelModeBadge.className = `mode-badge ${status.duffel.mode}`;
+            duffelModeBadge.style.display = "inline-block";
+        } else {
+            duffelModeBadge.style.display = "none";
+        }
+
+    } catch (err) {
+        console.error(err);
+        if (ledRyanair) ledRyanair.className = "status-led led-error";
+        if (ryanairDesc) ryanairDesc.textContent = "Errore di connettività backend";
+        if (ledDuffel) ledDuffel.className = "status-led led-error";
+        if (duffelDesc) duffelDesc.textContent = "Errore di connettività backend";
+        if (duffelModeBadge) duffelModeBadge.style.display = "none";
+    }
+}
+
 // Configurazione della logica di Autocomplete
 function setupAutocomplete(inputEl, dropdownEl, clearBtnEl, setSelectionCallback) {
-    // Evento Input
+    let debounceTimer = null;
+
+    // Evento Input: debounce 300ms poi fetch dinamico
     inputEl.addEventListener("input", () => {
-        const query = inputEl.value.trim().toLowerCase();
+        const query = inputEl.value.trim();
         if (!query) {
             clearBtnEl.style.display = "none";
             hideDropdown(dropdownEl);
             setSelectionCallback("");
+            clearTimeout(debounceTimer);
             return;
         }
 
         clearBtnEl.style.display = "block";
         setSelectionCallback(""); // Azzera la selezione reale finché non si clicca un elemento
 
-        // Filtra gli aeroporti per nome, città o codice IATA
-        const filtered = airportsList.filter(a => 
-            a.name.toLowerCase().includes(query) || 
-            a.city.toLowerCase().includes(query) || 
-            a.code.toLowerCase().includes(query) ||
-            a.country.toLowerCase().includes(query)
-        ).slice(0, 10); // Limita a 10 risultati per leggibilità
+        // Mostra subito "Ricerca in corso..."
+        dropdownEl.innerHTML = `<div class="dropdown-item" style="cursor:default;opacity:0.6;">🔍 Ricerca in corso...</div>`;
+        showDropdown(dropdownEl);
 
-        renderDropdownItems(filtered, dropdownEl, inputEl, clearBtnEl, setSelectionCallback);
+        // Debounce: aspetta 300ms prima di chiamare il backend
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/airports?q=${encodeURIComponent(query)}`);
+                if (!response.ok) throw new Error("Errore fetch aeroporti");
+                const airports = await response.json();
+                // Aggiorna anche la lista globale con i nuovi dati per i helper di rendering
+                airports.forEach(a => {
+                    if (!airportsList.find(x => x.code === a.code)) airportsList.push(a);
+                });
+                renderDropdownItems(airports, dropdownEl, inputEl, clearBtnEl, setSelectionCallback);
+            } catch (err) {
+                console.error(err);
+                dropdownEl.innerHTML = `<div class="dropdown-item" style="cursor:default;opacity:0.6;">Errore nel caricamento</div>`;
+            }
+        }, 300);
     });
 
-    // Focus input
-    inputEl.addEventListener("focus", () => {
-        const query = inputEl.value.trim().toLowerCase();
+    // Focus input: se vuoto mostra aeroporti popolari
+    inputEl.addEventListener("focus", async () => {
+        const query = inputEl.value.trim();
         if (query) {
-            // Riesegue il filtro se c'è testo
-            const filtered = airportsList.filter(a => 
-                a.name.toLowerCase().includes(query) || 
-                a.city.toLowerCase().includes(query) || 
-                a.code.toLowerCase().includes(query) ||
-                a.country.toLowerCase().includes(query)
-            ).slice(0, 10);
-            renderDropdownItems(filtered, dropdownEl, inputEl, clearBtnEl, setSelectionCallback);
+            // Riesegue la ricerca se c'è già del testo
+            inputEl.dispatchEvent(new Event("input"));
         } else {
-            // Mostra i primi 8 aeroporti popolari di default
-            const popular = airportsList.slice(0, 8);
-            renderDropdownItems(popular, dropdownEl, inputEl, clearBtnEl, setSelectionCallback);
+            // Mostra aeroporti popolari (senza query)
+            dropdownEl.innerHTML = `<div class="dropdown-item" style="cursor:default;opacity:0.6;">⭐ Aeroporti popolari</div>`;
+            showDropdown(dropdownEl);
+            try {
+                const response = await fetch("/api/airports");
+                if (!response.ok) throw new Error("Errore fetch aeroporti");
+                const popular = await response.json();
+                // Aggiorna la lista globale
+                popular.forEach(a => {
+                    if (!airportsList.find(x => x.code === a.code)) airportsList.push(a);
+                });
+                renderDropdownItems(popular, dropdownEl, inputEl, clearBtnEl, setSelectionCallback);
+            } catch (err) {
+                hideDropdown(dropdownEl);
+            }
         }
     });
 
@@ -259,6 +341,7 @@ function setupAutocomplete(inputEl, dropdownEl, clearBtnEl, setSelectionCallback
         clearBtnEl.style.display = "none";
         setSelectionCallback("");
         hideDropdown(dropdownEl);
+        clearTimeout(debounceTimer);
         inputEl.focus();
     });
 }
@@ -370,6 +453,13 @@ function renderResults(routes) {
         const card = document.createElement("div");
         card.className = `flight-card glass ${isDirect ? "direct" : "connecting"}`;
 
+        // Estraiamo i dettagli delle compagnie e numeri di volo
+        const carrier1 = route["First Leg Carrier"] || "Ryanair";
+        const fn1 = route["First Leg Flight Number"] || "-";
+        
+        const carrier2 = route["Second Leg Carrier"] || "-";
+        const fn2 = route["Second Leg Flight Number"] || "-";
+
         // Costruiamo il layout HTML per ciascun volo
         let routeHtml = `
             <div class="flight-type-badge">${isDirect ? "Diretto" : "Scalo"}</div>
@@ -378,6 +468,7 @@ function renderResults(routes) {
                 <div class="flight-segment">
                     <div class="airport-info">
                         <span class="code">${getAirportCityAndCode(route["Connection"].split("-")[0].trim())}</span>
+                        <span class="carrier-badge">${carrier1} <small>${fn1}</small></span>
                     </div>
                     <div class="segment-line-container">
                         <span class="duration-label">${route["First Leg Departure"] !== "-" ? "Partenza" : ""}</span>
@@ -414,6 +505,7 @@ function renderResults(routes) {
                 <div class="flight-segment">
                     <div class="airport-info">
                         <span class="code">${getAirportCityAndCode(layoverAirport)}</span>
+                        <span class="carrier-badge">${carrier2} <small>${fn2}</small></span>
                     </div>
                     <div class="segment-line-container">
                         <span class="duration-label">Coincidenza</span>
