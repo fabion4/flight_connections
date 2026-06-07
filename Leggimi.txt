@@ -1,6 +1,0 @@
-Per attivare la ricerca voli
-
-C:\Users\s005354\Downloads\Portable Python-3.10.5 x64\Console-Launcher.exe (su desktop lavoro hai link)
-venv\Scripts\activate
-streamlit run app.py
-http://localhost:8501
