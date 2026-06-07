@@ -384,12 +384,16 @@ function renderDropdownItems(items, dropdownEl, inputEl, clearBtnEl, setSelectio
             <div class="airport-name">${airport.city} (${airport.name})</div>
             <div class="airport-code">${airport.code}</div>
         `;
-        div.addEventListener("click", () => {
+        const selectItem = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             inputEl.value = `${airport.city} (${airport.code})`;
             clearBtnEl.style.display = "block";
             setSelectionCallback(airport.code);
             hideDropdown(dropdownEl);
-        });
+        };
+        div.addEventListener("mousedown", selectItem);
+        div.addEventListener("touchstart", selectItem, { passive: false });
         dropdownEl.appendChild(div);
     });
 
