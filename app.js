@@ -686,7 +686,7 @@ function renderResults(routes, updateFilter = true) {
                 <!-- Primo Volo (o Volo Diretto) -->
                 <div class="flight-segment">
                     <div class="airport-info">
-                        <span class="code">${getAirportCityAndCode(route["Connection"].split("-")[0].trim())}</span>
+                        <span class="code">${getAirportCityAndCodeEnriched(route["Connection"].split("-")[0].trim(), route["First Leg Origin City"])}</span>
                         <span class="carrier-badge">${carrier1} <small>${fn1}</small></span>
                     </div>
                     <div class="segment-line-container">
@@ -704,7 +704,7 @@ function renderResults(routes, updateFilter = true) {
                         <span class="date">${formatDate(route["First Leg Arrival"])}</span>
                     </div>
                     <div class="airport-info" style="text-align: right;">
-                        <span class="code">${getAirportCityAndCode(route["Connection"].split("-")[1].split("(")[0].split("|")[0].trim())}</span>
+                        <span class="code">${getAirportCityAndCodeEnriched(route["Connection"].split("-")[1].split("(")[0].split("|")[0].trim(), route["First Leg Destination City"])}</span>
                     </div>
                 </div>
         `;
@@ -717,13 +717,13 @@ function renderResults(routes, updateFilter = true) {
             routeHtml += `
                 <!-- Barra Scalo -->
                 <div class="layover-bar">
-                    <span>🕒 Scalo a <strong>${getAirportCity(layoverAirport)} (${layoverAirport})</strong> per <strong>${layoverHours} ore</strong></span>
+                    <span>🕒 Scalo a <strong>${getAirportCityEnriched(layoverAirport, route["First Leg Destination City"])} (${layoverAirport})</strong> per <strong>${layoverHours} ore</strong></span>
                 </div>
 
                 <!-- Secondo Volo -->
                 <div class="flight-segment">
                     <div class="airport-info">
-                        <span class="code">${getAirportCityAndCode(layoverAirport)}</span>
+                        <span class="code">${getAirportCityAndCodeEnriched(layoverAirport, route["Second Leg Origin City"])}</span>
                         <span class="carrier-badge">${carrier2} <small>${fn2}</small></span>
                     </div>
                     <div class="segment-line-container">
@@ -741,7 +741,7 @@ function renderResults(routes, updateFilter = true) {
                         <span class="date">${formatDate(route["Second Leg Arrival"])}</span>
                     </div>
                     <div class="airport-info" style="text-align: right;">
-                        <span class="code">${getAirportCityAndCode(route["Connection"].split("|")[1].split("-")[1].trim())}</span>
+                        <span class="code">${getAirportCityAndCodeEnriched(route["Connection"].split("|")[1].split("-")[1].trim(), route["Second Leg Destination City"])}</span>
                     </div>
                 </div>
             `;
@@ -765,12 +765,18 @@ function renderResults(routes, updateFilter = true) {
 }
 
 // Helper per ottenere città e codice formattato
-function getAirportCityAndCode(iataCode) {
+function getAirportCityAndCodeEnriched(iataCode, cityName) {
+    if (cityName && cityName !== "-") {
+        return `${cityName} (${iataCode})`;
+    }
     const airport = airportsList.find(a => a.code === iataCode);
     return airport ? `${airport.city} (${iataCode})` : iataCode;
 }
 
-function getAirportCity(iataCode) {
+function getAirportCityEnriched(iataCode, cityName) {
+    if (cityName && cityName !== "-") {
+        return cityName;
+    }
     const airport = airportsList.find(a => a.code === iataCode);
     return airport ? airport.city : iataCode;
 }

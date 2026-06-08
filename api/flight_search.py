@@ -74,6 +74,13 @@ def find_best_routes(start_airport, end_airport, start_date, end_date, max_layov
         else:
             curr = curr.replace(month=curr.month + 1, day=1)
             
+    # Recupera elenco aeroporti per associare le città
+    airports = get_airports()
+    airport_lookup = {
+        a["iataCode"]: a.get("city", {}).get("name", a["name"])
+        for a in airports if "iataCode" in a
+    }
+
     routes = []
  
     # 🔹 1. Controlliamo se esiste un volo diretto
@@ -84,6 +91,8 @@ def find_best_routes(start_airport, end_airport, start_date, end_date, max_layov
         
     for flight in direct_flights:
         if start_dt.date() <= flight["departure"].date() <= end_dt.date():
+            from_city = airport_lookup.get(flight["from"], flight["from"])
+            to_city = airport_lookup.get(flight["to"], flight["to"])
             routes.append({
                 "Connection": f"{flight['from']}-{flight['to']} (Diretto)",
                 "First Leg Departure": flight["departure"].strftime("%Y-%m-%d %H:%M"),
@@ -96,7 +105,11 @@ def find_best_routes(start_airport, end_airport, start_date, end_date, max_layov
                 "Second Leg Flight Number": "-",
                 "Layover (h)": 0,
                 "Total Duration (h)": (flight["arrival"] - flight["departure"]).total_seconds() / 3600,
-                "Total Price (€)": flight["price"]
+                "Total Price (€)": flight["price"],
+                "First Leg Origin City": from_city,
+                "First Leg Destination City": to_city,
+                "Second Leg Origin City": "-",
+                "Second Leg Destination City": "-"
             })
  
     # 🔹 2. Cerchiamo voli con scalo
@@ -134,7 +147,11 @@ def find_best_routes(start_airport, end_airport, start_date, end_date, max_layov
                     "Second Leg Flight Number": f2["flight_number"],
                     "Layover (h)": round(layover_time, 1),
                     "Total Duration (h)": round(total_duration, 1),
-                    "Total Price (€)": total_price
+                    "Total Price (€)": total_price,
+                    "First Leg Origin City": airport_lookup.get(f1["from"], f1["from"]),
+                    "First Leg Destination City": airport_lookup.get(f1["to"], f1["to"]),
+                    "Second Leg Origin City": airport_lookup.get(f2["from"], f2["from"]),
+                    "Second Leg Destination City": airport_lookup.get(f2["to"], f2["to"])
                 })
  
     # 🔹 3. Creiamo il DataFrame ordinato per prezzo

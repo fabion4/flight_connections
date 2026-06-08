@@ -8,6 +8,20 @@ from typing import List, Dict
 # Recuperiamo il token Duffel leggendo dal file d'ambiente
 DUFFEL_TOKEN = os.getenv("DUFFEL_ACCESS_TOKEN")
 
+def _get_place_name(place: dict) -> str:
+    if not place:
+        return ""
+    # Cerca prima city_name, poi city -> name, poi name, infine fallbacks
+    city_name = place.get("city_name")
+    if city_name:
+        return city_name
+    city_obj = place.get("city")
+    if isinstance(city_obj, dict):
+        city_name = city_obj.get("name")
+        if city_name:
+            return city_name
+    return place.get("name", place.get("iata_code", ""))
+
 def get_flight_data_duffel(from_code: str, to_code: str, date_str: str) -> List[Dict]:
     """
     Interroga Duffel API v2 per cercare voli tra due aeroporti
@@ -75,7 +89,11 @@ def get_flight_data_duffel(from_code: str, to_code: str, date_str: str) -> List[
                         "Second Leg Flight Number": "-",
                         "Layover (h)": 0.0,
                         "Total Duration (h)": round((arr_dt - dep_dt).total_seconds() / 3600, 1),
-                        "Total Price (€)": float(offer.get("total_amount", 0.0))
+                        "Total Price (€)": float(offer.get("total_amount", 0.0)),
+                        "First Leg Origin City": _get_place_name(seg.get("origin")),
+                        "First Leg Destination City": _get_place_name(seg.get("destination")),
+                        "Second Leg Origin City": "-",
+                        "Second Leg Destination City": "-"
                     })
                 
                 # Gestiamo voli con 1 scalo (2 segmenti)
@@ -103,7 +121,11 @@ def get_flight_data_duffel(from_code: str, to_code: str, date_str: str) -> List[
                         "Second Leg Flight Number": f"{seg2.get('operating_carrier', {}).get('iata_code', 'ZZ')}{seg2.get('flight_number', '999')}",
                         "Layover (h)": round(layover_time, 1),
                         "Total Duration (h)": round(total_duration, 1),
-                        "Total Price (€)": float(offer.get("total_amount", 0.0))
+                        "Total Price (€)": float(offer.get("total_amount", 0.0)),
+                        "First Leg Origin City": _get_place_name(seg1.get("origin")),
+                        "First Leg Destination City": _get_place_name(seg1.get("destination")),
+                        "Second Leg Origin City": _get_place_name(seg2.get("origin")),
+                        "Second Leg Destination City": _get_place_name(seg2.get("destination"))
                     })
         
         return results
