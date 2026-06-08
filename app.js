@@ -16,7 +16,8 @@ const arrInput = document.getElementById("arrival-input");
 const arrDropdown = document.getElementById("arrival-dropdown");
 const clearArrBtn = document.getElementById("clear-arr-btn");
 
-const dateInput = document.getElementById("departure-date");
+const dateStartInput = document.getElementById("departure-date-start");
+const dateEndInput = document.getElementById("departure-date-end");
 const dateInputText = document.getElementById("departure-date-input");
 const dateIconTrigger = document.getElementById("date-icon-trigger");
 const calendarDropdown = document.getElementById("calendar-dropdown");
@@ -50,19 +51,24 @@ const deselectAllBtn = document.getElementById("deselect-all-carriers");
 
 // Stato del Calendario Custom
 let calendarCurrentDate = new Date(); // Data correntemente visualizzata sul calendario
-let selectedDate = null; // Data selezionata dall'utente
+let selectedStartDate = null; // Data inizio selezionata dall'utente
+let selectedEndDate = null; // Data fine selezionata dall'utente
 
 // Inizializzazione della Pagina
 document.addEventListener("DOMContentLoaded", () => {
-    // Imposta la data di default a domani
+    // Imposta la data di default a domani e dopodomani
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     
+    const afterTomorrow = new Date();
+    afterTomorrow.setDate(afterTomorrow.getDate() + 3);
+    
     // Imposta lo stato iniziale
-    selectedDate = tomorrow;
+    selectedStartDate = tomorrow;
+    selectedEndDate = afterTomorrow;
     calendarCurrentDate = new Date(tomorrow);
     
-    updateDateInputFields(tomorrow);
+    updateDateInputFields(tomorrow, afterTomorrow);
 
     // Carica gli aeroporti dal backend
     loadAirports();
@@ -122,15 +128,29 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Aggiorna i valori nei campi input reali e visibili
-function updateDateInputFields(date) {
-    const formattedYMD = date.toISOString().split("T")[0];
-    dateInput.value = formattedYMD;
+function updateDateInputFields(start, end) {
+    if (!start) return;
     
-    // Formato visibile all'utente: DD/MM/YYYY
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    dateInputText.value = `${day}/${month}/${year}`;
+    // Formattazione locale per data inizio
+    const startY = start.getFullYear();
+    const startM = String(start.getMonth() + 1).padStart(2, '0');
+    const startD = String(start.getDate()).padStart(2, '0');
+    const startYMD = `${startY}-${startM}-${startD}`;
+    dateStartInput.value = startYMD;
+    
+    if (end) {
+        // Formattazione locale per data fine
+        const endY = end.getFullYear();
+        const endM = String(end.getMonth() + 1).padStart(2, '0');
+        const endD = String(end.getDate()).padStart(2, '0');
+        const endYMD = `${endY}-${endM}-${endD}`;
+        dateEndInput.value = endYMD;
+        
+        dateInputText.value = `${startD}/${startM}/${startY} - ${endD}/${endM}/${endY}`;
+    } else {
+        dateEndInput.value = "";
+        dateInputText.value = `${startD}/${startM}/${startY} - Scegli fine...`;
+    }
 }
 
 // Funzioni Calendario Custom
@@ -205,16 +225,45 @@ function renderCalendar() {
             if (thisDate.getTime() === today.getTime()) {
                 dayDiv.classList.add("today");
             }
-            // Selezionato
-            if (selectedDate && thisDate.getTime() === selectedDate.getTime()) {
+            
+            // Selezionato (inizio o fine)
+            if (selectedStartDate && thisDate.getTime() === selectedStartDate.getTime()) {
                 dayDiv.classList.add("selected");
+                dayDiv.classList.add("start-date");
+            }
+            if (selectedEndDate && thisDate.getTime() === selectedEndDate.getTime()) {
+                dayDiv.classList.add("selected");
+                dayDiv.classList.add("end-date");
+            }
+            
+            // In range (compreso tra inizio e fine)
+            if (selectedStartDate && selectedEndDate && thisDate > selectedStartDate && thisDate < selectedEndDate) {
+                dayDiv.classList.add("in-range");
             }
             
             dayDiv.addEventListener("click", (e) => {
                 e.stopPropagation();
-                selectedDate = thisDate;
-                updateDateInputFields(thisDate);
-                hideCalendar();
+                
+                if (!selectedStartDate || (selectedStartDate && selectedEndDate)) {
+                    // Reset e seleziona nuova data inizio
+                    selectedStartDate = thisDate;
+                    selectedEndDate = null;
+                    updateDateInputFields(selectedStartDate, null);
+                    renderCalendar(); // Ridisegna per mostrare la selezione iniziale
+                } else {
+                    // C'è già una data d'inizio ma non di fine
+                    if (thisDate < selectedStartDate) {
+                        // Se clicca una data precedente all'inizio corrente, sposta l'inizio
+                        selectedStartDate = thisDate;
+                        updateDateInputFields(selectedStartDate, null);
+                        renderCalendar();
+                    } else {
+                        // Imposta la data di fine e chiude il calendario
+                        selectedEndDate = thisDate;
+                        updateDateInputFields(selectedStartDate, selectedEndDate);
+                        hideCalendar();
+                    }
+                }
             });
         }
         
@@ -421,8 +470,14 @@ async function handleSearch() {
         return;
     }
 
-    const date = dateInput.value;
+    const dateStart = dateStartInput.value;
+    const dateEnd = dateEndInput.value;
     const layover = layoverSlider.value;
+
+    if (!dateStart || !dateEnd) {
+        alert("Seleziona un intervallo completo (data di inizio e fine) sul calendario.");
+        return;
+    }
 
     // Cambia stato dell'interfaccia (mostra loader, nascondi risultati)
     welcomeState.style.display = "none";
@@ -440,7 +495,8 @@ async function handleSearch() {
         const queryParams = new URLSearchParams({
             start: selectedDepCode,
             end: selectedArrCode,
-            date: date,
+            start_date: dateStart,
+            end_date: dateEnd,
             max_layover_days: layover
         });
         

@@ -55,28 +55,49 @@ def get_flight_data(from_code, to_code, date):
     
     return []
 
-def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
-    """Trova tutte le connessioni ottimali tra start_airport e end_airport, includendo voli diretti."""
+def find_best_routes(start_airport, end_airport, start_date, end_date, max_layover_days=3):
+    """Trova tutte le connessioni ottimali tra start_airport e end_airport compresi nel range di date, includendo voli diretti."""
     
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    
+    # Raccogliamo i mesi da interrogare (Ryanair interroga a livello mensile)
+    months = []
+    curr = start_dt
+    while curr <= end_dt:
+        month_first_day = curr.replace(day=1)
+        if month_first_day not in months:
+            months.append(month_first_day)
+        # Vai al mese successivo
+        if curr.month == 12:
+            curr = curr.replace(year=curr.year + 1, month=1, day=1)
+        else:
+            curr = curr.replace(month=curr.month + 1, day=1)
+            
     routes = []
  
     # 🔹 1. Controlliamo se esiste un volo diretto
-    direct_flights = get_flight_data(start_airport, end_airport, date)
+    direct_flights = []
+    for m in months:
+        date_str = m.strftime("%Y-%m-%d")
+        direct_flights.extend(get_flight_data(start_airport, end_airport, date_str))
+        
     for flight in direct_flights:
-        routes.append({
-            "Connection": f"{flight['from']}-{flight['to']} (Diretto)",
-            "First Leg Departure": flight["departure"].strftime("%Y-%m-%d %H:%M"),
-            "First Leg Arrival": flight["arrival"].strftime("%Y-%m-%d %H:%M"),
-            "First Leg Carrier": flight["carrier"],
-            "First Leg Flight Number": flight["flight_number"],
-            "Second Leg Departure": "-",
-            "Second Leg Arrival": "-",
-            "Second Leg Carrier": "-",
-            "Second Leg Flight Number": "-",
-            "Layover (h)": 0,
-            "Total Duration (h)": (flight["arrival"] - flight["departure"]).total_seconds() / 3600,
-            "Total Price (€)": flight["price"]
-        })
+        if start_dt.date() <= flight["departure"].date() <= end_dt.date():
+            routes.append({
+                "Connection": f"{flight['from']}-{flight['to']} (Diretto)",
+                "First Leg Departure": flight["departure"].strftime("%Y-%m-%d %H:%M"),
+                "First Leg Arrival": flight["arrival"].strftime("%Y-%m-%d %H:%M"),
+                "First Leg Carrier": flight["carrier"],
+                "First Leg Flight Number": flight["flight_number"],
+                "Second Leg Departure": "-",
+                "Second Leg Arrival": "-",
+                "Second Leg Carrier": "-",
+                "Second Leg Flight Number": "-",
+                "Layover (h)": 0,
+                "Total Duration (h)": (flight["arrival"] - flight["departure"]).total_seconds() / 3600,
+                "Total Price (€)": flight["price"]
+            })
  
     # 🔹 2. Cerchiamo voli con scalo
     first_leg_airports = get_available_destinations(start_airport)
@@ -84,10 +105,18 @@ def find_best_routes(start_airport, end_airport, date, max_layover_days=3):
     valid_airports = set(first_leg_airports) & set(second_leg_airports)
  
     for via_airport in valid_airports:
-        first_leg = get_flight_data(start_airport, via_airport, date)
-        second_leg = get_flight_data(via_airport, end_airport, date)
+        first_leg = []
+        second_leg = []
+        for m in months:
+            date_str = m.strftime("%Y-%m-%d")
+            first_leg.extend(get_flight_data(start_airport, via_airport, date_str))
+            second_leg.extend(get_flight_data(via_airport, end_airport, date_str))
  
         for f1, f2 in product(first_leg, second_leg):
+            # La prima tratta deve partire all'interno dell'intervallo di date
+            if not (start_dt.date() <= f1["departure"].date() <= end_dt.date()):
+                continue
+                
             layover_time = (f2["departure"] - f1["arrival"]).total_seconds() / 3600
             total_duration = (f2["arrival"] - f1["departure"]).total_seconds() / 3600
  

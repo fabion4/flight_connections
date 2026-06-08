@@ -1,6 +1,7 @@
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 from typing import List, Dict
 
@@ -111,16 +112,48 @@ def get_flight_data_duffel(from_code: str, to_code: str, date_str: str) -> List[
         print(f"Errore durante l'interrogazione di Duffel: {str(e)}")
         return []
 
-def find_best_routes_duffel(start_airport: str, end_airport: str, date: str, max_layover_days: int = 3) -> pd.DataFrame:
+def find_best_routes_duffel(start_airport: str, end_airport: str, start_date: str, end_date: str, max_layover_days: int = 3) -> pd.DataFrame:
     """
-    Trova rotte dirette e con 1 scalo interpellando Duffel API v2.
+    Trova rotte dirette e con 1 scalo interpellando Duffel API v2 per un intervallo di date.
     Filtra i voli con scalo che superano max_layover_days.
     """
-    routes = get_flight_data_duffel(start_airport, end_airport, date)
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    
+    # Limita l'intervallo a massimo 7 giorni consecutivi per evitare eccessivo carico
+    delta_days = (end_dt - start_dt).days
+    if delta_days < 0:
+        return pd.DataFrame()
+    elif delta_days > 6:
+        end_dt = start_dt + timedelta(days=6)
+        
+    # Genera la lista delle date in formato YYYY-MM-DD
+    dates_to_query = []
+    curr = start_dt
+    while curr <= end_dt:
+        dates_to_query.append(curr.strftime("%Y-%m-%d"))
+        curr += timedelta(days=1)
+        
+    all_routes = []
+    
+    # Chiamate in parallelo su Duffel
+    with ThreadPoolExecutor(max_workers=len(dates_to_query)) as executor:
+        futures = {
+            executor.submit(get_flight_data_duffel, start_airport, end_airport, d): d
+            for d in dates_to_query
+        }
+        
+        for future in futures:
+            try:
+                day_routes = future.result()
+                if day_routes:
+                    all_routes.extend(day_routes)
+            except Exception as e:
+                print(f"Errore durante la ricerca Duffel per data {futures[future]}: {e}")
     
     # Filtriamo eventuali voli con scalo che superano il tempo massimo richiesto
     filtered_routes = []
-    for r in routes:
+    for r in all_routes:
         if r["Layover (h)"] > (max_layover_days * 24):
             continue
         filtered_routes.append(r)

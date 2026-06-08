@@ -175,16 +175,17 @@ def read_airports(q: Optional[str] = Query(None, description="Query di ricerca a
 def search_flights(
     start: str = Query(..., description="Codice IATA aeroporto di partenza"),
     end: str = Query(..., description="Codice IATA aeroporto di arrivo"),
-    date: str = Query(..., description="Data di partenza (YYYY-MM-DD)"),
+    start_date: str = Query(..., description="Data di partenza iniziale (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="Data di partenza finale (YYYY-MM-DD)"),
     max_layover_days: int = Query(3, ge=1, le=5, description="Tempo massimo di scalo in giorni")
 ):
-    """Cerca le migliori rotte dirette e con 1 scalo per la data specificata (Ryanair + Duffel)."""
+    """Cerca le migliori rotte dirette e con 1 scalo per il range di date specificato (Ryanair + Duffel)."""
     try:
         # Cerca i voli Ryanair
-        df_ryanair = find_best_routes(start, end, date, max_layover_days)
+        df_ryanair = find_best_routes(start, end, start_date, end_date, max_layover_days)
         
         # Cerca i voli Duffel (Sandbox/Live)
-        df_duffel = find_best_routes_duffel(start, end, date, max_layover_days)
+        df_duffel = find_best_routes_duffel(start, end, start_date, end_date, max_layover_days)
         
         # Uniamo i risultati
         if df_ryanair.empty and df_duffel.empty:
