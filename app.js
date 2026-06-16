@@ -486,6 +486,15 @@ async function handleSearch() {
     loaderState.style.display = "flex";
     resetCarrierFilter(); // Reset filtro compagnie ad ogni nuova ricerca
     
+    // Inizializza progress bar
+    const progressBarFill = document.getElementById("progress-bar-fill");
+    const loaderProgressText = document.getElementById("loader-progress-text");
+    const loaderText = document.getElementById("loader-text");
+    
+    if (progressBarFill) progressBarFill.style.width = "0%";
+    if (loaderProgressText) loaderProgressText.textContent = "Inizializzazione... (0%)";
+    if (loaderText) loaderText.textContent = "Ricerca dei voli migliori in corso...";
+
     // Disabilita pulsante
     searchBtn.disabled = true;
     searchBtn.querySelector(".btn-text").textContent = "Cercando...";
@@ -503,7 +512,38 @@ async function handleSearch() {
         const response = await fetch(`/api/search?${queryParams}`);
         if (!response.ok) throw new Error("Errore del server durante la ricerca.");
 
-        const results = await response.json();
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let results = [];
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop(); // Salva la parte incompleta nel buffer
+
+            for (const line of lines) {
+                if (line.trim()) {
+                    try {
+                        const parsed = JSON.parse(line);
+                        if (parsed.type === "progress") {
+                            if (progressBarFill) progressBarFill.style.width = parsed.percent + "%";
+                            if (loaderProgressText) loaderProgressText.textContent = `${parsed.message} (${parsed.percent}%)`;
+                        } else if (parsed.type === "results") {
+                            results = parsed.data;
+                        } else if (parsed.type === "error") {
+                            throw new Error(parsed.message);
+                        }
+                    } catch (e) {
+                        console.error("Errore nel parsing dello stream:", e);
+                    }
+                }
+            }
+        }
+
         currentResults = results; // Salviamo per esportazione
 
         if (results.length === 0) {
@@ -513,7 +553,7 @@ async function handleSearch() {
         }
     } catch (err) {
         console.error(err);
-        showSystemError("Errore di Connessione ❌", "Si è verificato un errore nel comunicare con il server. Riprova più tardi.");
+        showSystemError("Errore durante la ricerca ❌", err.message || "Si è verificato un errore nel comunicare con il server. Riprova più tardi.");
     } finally {
         // Ripristina pulsante e stato loader
         searchBtn.disabled = false;
