@@ -148,8 +148,11 @@
             <!-- Loading Skeleton / Spinner State -->
             <div id="loader-state" class="loader-state" style="display: none;">
                 <div class="spinner"></div>
-                <p>Ricerca dei voli migliori in corso...</p>
-                <p class="loader-sub">Questo processo può richiedere alcuni secondi per scaricare i dati in tempo reale</p>
+                <p id="loader-text">Ricerca dei voli migliori in corso...</p>
+                <div class="progress-bar-container">
+                    <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                </div>
+                <p id="loader-progress-text" class="loader-sub">Avvio in corso (0%)</p>
             </div>
 
             <!-- Error State -->

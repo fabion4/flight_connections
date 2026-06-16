@@ -1108,3 +1108,24 @@ header .subtitle {
         align-items: flex-start;
     }
 }
+
+/* Progress Bar per ricerca in tempo reale */
+.progress-bar-container {
+    width: 80%;
+    max-width: 400px;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    margin: 0.5rem auto 1rem auto;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-indigo) 0%, var(--accent-violet) 100%);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+    border-radius: 6px;
+    transition: width 0.3s ease;
+}

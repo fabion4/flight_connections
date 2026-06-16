@@ -13,12 +13,14 @@ load_dotenv()
 
 # Import robusti per supportare sia l'esecuzione locale che Vercel Serverless
 try:
-    from api.flight_search import find_best_routes, get_airports
-    from api.duffel_search import find_best_routes_duffel
+    from api.providers.ryanair import RyanairProvider, get_airports
+    from api.providers.duffel import DuffelProvider
+    from api.router import find_connections
     from api.utils import save_to_excel_in_memory
 except ImportError:
-    from flight_search import find_best_routes, get_airports
-    from duffel_search import find_best_routes_duffel
+    from providers.ryanair import RyanairProvider, get_airports
+    from providers.duffel import DuffelProvider
+    from router import find_connections
     from utils import save_to_excel_in_memory
 
 app = FastAPI(title="Flight Connection API", description="API per la ricerca di voli e connessioni Ryanair e Duffel")
@@ -171,6 +173,40 @@ def read_airports(q: Optional[str] = Query(None, description="Query di ricerca a
 
     return combined[:20]  # Limita a 20 risultati per leggibilità del dropdown
 
+def _generate_monthly_dates(start_date: str, end_date: str) -> list[str]:
+    from datetime import datetime
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    months = []
+    curr = start_dt
+    while curr <= end_dt:
+        month_first_day = curr.replace(day=1)
+        month_str = month_first_day.strftime("%Y-%m-%d")
+        if month_str not in months:
+            months.append(month_str)
+        if curr.month == 12:
+            curr = curr.replace(year=curr.year + 1, month=1, day=1)
+        else:
+            curr = curr.replace(month=curr.month + 1, day=1)
+    return months
+
+def _generate_daily_dates(start_date: str, end_date: str) -> list[str]:
+    from datetime import datetime, timedelta
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    delta_days = (end_dt - start_dt).days
+    if delta_days < 0:
+        return []
+    elif delta_days > 29:
+        end_dt = start_dt + timedelta(days=29)
+    
+    dates = []
+    curr = start_dt
+    while curr <= end_dt:
+        dates.append(curr.strftime("%Y-%m-%d"))
+        curr += timedelta(days=1)
+    return dates
+
 @app.get("/api/search")
 def search_flights(
     start: str = Query(..., description="Codice IATA aeroporto di partenza"),
@@ -179,33 +215,76 @@ def search_flights(
     end_date: str = Query(..., description="Data di partenza finale (YYYY-MM-DD)"),
     max_layover_days: int = Query(3, ge=1, le=5, description="Tempo massimo di scalo in giorni")
 ):
-    """Cerca le migliori rotte dirette e con 1 scalo per il range di date specificato (Ryanair + Duffel)."""
-    try:
-        # Cerca i voli Ryanair
-        df_ryanair = find_best_routes(start, end, start_date, end_date, max_layover_days)
-        
-        # Cerca i voli Duffel (Sandbox/Live)
-        df_duffel = find_best_routes_duffel(start, end, start_date, end_date, max_layover_days)
-        
-        # Uniamo i risultati
-        if df_ryanair.empty and df_duffel.empty:
-            return []
-        elif df_ryanair.empty:
-            df_combined = df_duffel
-        elif df_duffel.empty:
-            df_combined = df_ryanair
-        else:
-            df_combined = pd.concat([df_ryanair, df_duffel], ignore_index=True)
+    """Cerca le migliori rotte dirette e con 1 scalo per il range di date specificato (Ryanair + Duffel) con aggiornamenti di progresso in tempo reale."""
+    import json
+    import queue
+    import threading
+
+    def generate():
+        try:
+            print(f"\n[Search Stream] Richiesta ricevuta: {start} -> {end} dal {start_date} al {end_date} (Max scalo: {max_layover_days}gg)")
             
-        # Ordina per prezzo totale crescente
-        df_combined = df_combined.sort_values(by="Total Price (€)")
-        
-        # Convertiamo il DataFrame in JSON-friendly
-        df_combined = df_combined.replace({"-": None})
-        records = df_combined.to_dict(orient="records")
-        return records
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Errore durante la ricerca: {str(e)}")
+            # 1. Inizio e ricerca Ryanair
+            yield json.dumps({"type": "progress", "percent": 5, "message": "Inizializzazione ricerca..."}) + "\n"
+            yield json.dumps({"type": "progress", "percent": 10, "message": "Ricerca connessioni Ryanair in corso..."}) + "\n"
+            
+            dates_ryanair = _generate_monthly_dates(start_date, end_date)
+            connections_ryanair = find_connections(RyanairProvider(), start, end, dates_ryanair, max_layover_days * 24, filter_start=start_date, filter_end=end_date)
+            print(f"[Search Stream] Ryanair ha completato con {len(connections_ryanair)} combinazioni.")
+            yield json.dumps({"type": "progress", "percent": 20, "message": f"Ryanair completato. Trovate {len(connections_ryanair)} rotte."}) + "\n"
+            
+            # 2. Ricerca Duffel con coda sincronizzata
+            q = queue.Queue()
+            dates_duffel = _generate_daily_dates(start_date, end_date)
+            connections_duffel_container = []
+            
+            def duffel_progress_callback(percent, message):
+                q.put({"type": "progress", "percent": percent, "message": message})
+                
+            def run_duffel_thread():
+                try:
+                    provider = DuffelProvider(start, end, dates_duffel, progress_callback=duffel_progress_callback)
+                    conns = find_connections(provider, start, end, dates_duffel, max_layover_days * 24, filter_start=start_date, filter_end=end_date)
+                    connections_duffel_container.append(conns)
+                except Exception as ex:
+                    print(f"[Search Stream] Errore Duffel thread: {ex}")
+                    q.put({"type": "error", "message": str(ex)})
+                finally:
+                    q.put(None) # Segnale di fine coda
+                    
+            t = threading.Thread(target=run_duffel_thread)
+            t.start()
+            
+            # Consuma la coda e invia i progressi in tempo reale
+            while True:
+                item = q.get()
+                if item is None:
+                    break
+                if item.get("type") == "error":
+                    yield json.dumps({"type": "progress", "percent": 90, "message": f"Duffel non disponibile: {item['message']}"}) + "\n"
+                else:
+                    yield json.dumps(item) + "\n"
+                    
+            t.join()
+            
+            connections_duffel = connections_duffel_container[0] if connections_duffel_container else []
+            print(f"[Search Stream] Duffel ha completato con {len(connections_duffel)} combinazioni.")
+            
+            # 3. Fusione e ordinamento dei dati
+            yield json.dumps({"type": "progress", "percent": 96, "message": "Unione e ordinamento risultati..."}) + "\n"
+            
+            combined_connections = sorted(connections_ryanair + connections_duffel, key=lambda c: c.total_price)
+            records = [c.to_dict() for c in combined_connections]
+                
+            yield json.dumps({"type": "progress", "percent": 100, "message": "Fatto!"}) + "\n"
+            yield json.dumps({"type": "results", "data": records}) + "\n"
+            print(f"[Search Stream] Risultati totali inviati: {len(records)}\n")
+            
+        except Exception as e:
+            print(f"[Search Stream ERROR] Errore: {str(e)}")
+            yield json.dumps({"type": "error", "message": f"Errore ricerca: {str(e)}"}) + "\n"
+            
+    return StreamingResponse(generate(), media_type="application/x-ndjson")
 
 # Modello dati per l'esportazione in Excel
 class FlightRecord(BaseModel):

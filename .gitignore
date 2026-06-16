@@ -27,3 +27,7 @@ voli_trovati.xlsx
 .env
 .env.*
 *.local
+
+# Strumenti di lavoro locali (non per terzi)
+CLAUDE.md
+BACKLOG.md
