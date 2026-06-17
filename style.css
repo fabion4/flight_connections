@@ -65,11 +65,18 @@ header {
     margin-bottom: 2.5rem;
 }
 
+.header-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    margin-bottom: 0.5rem;
+}
+
 header .logo {
     display: inline-flex;
     align-items: center;
     gap: 0.75rem;
-    margin-bottom: 0.5rem;
 }
 
 header .logo .airplane-icon {
@@ -825,9 +832,19 @@ header .subtitle {
     body {
         padding: 1rem 0.5rem;
     }
-    
+
     header h1 {
         font-size: 2rem;
+    }
+
+    .header-top {
+        flex-direction: column;
+        gap: 0.6rem;
+    }
+
+    .header-api-status {
+        position: static;
+        transform: none;
     }
     
     .flight-card {
@@ -867,7 +884,54 @@ header .subtitle {
     }
 }
 
-/* Dashboard di Stato Connettività */
+/* ─── Header API status (LED compatti) ──────────────────────────────────────── */
+
+.header-api-status {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+
+.header-status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    position: relative;
+    cursor: default;
+}
+
+.header-status-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Tooltip on hover */
+.header-status-tooltip {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: rgba(17, 21, 32, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+}
+
+.header-status-item:hover .header-status-tooltip {
+    display: block;
+}
+
+/* Dashboard di Stato Connettività (non più usata, stili mantenuti per compatibilità) */
 .status-dashboard-section {
     margin-bottom: 1.5rem;
 }

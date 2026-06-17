@@ -16,34 +16,30 @@
     <div class="app-container">
         <!-- Header -->
         <header>
-            <div class="logo">
-                <span class="airplane-icon">✈️</span>
-                <h1>FlyConnect</h1>
+            <div class="header-top">
+                <div class="logo">
+                    <span class="airplane-icon">✈️</span>
+                    <h1>FlyConnect</h1>
+                </div>
+                <div class="header-api-status">
+                    <div class="header-status-item" id="status-ryanair">
+                        <span class="status-led led-unknown" id="led-ryanair"></span>
+                        <span class="header-status-label">Ryanair</span>
+                        <span class="header-status-tooltip" id="ryanair-desc">Inizializzazione...</span>
+                    </div>
+                    <div class="header-status-item" id="status-duffel">
+                        <span class="status-led led-unknown" id="led-duffel"></span>
+                        <span class="header-status-label">Duffel</span>
+                        <span class="mode-badge" id="duffel-mode-badge" style="display: none;"></span>
+                        <span class="header-status-tooltip" id="duffel-desc">Inizializzazione...</span>
+                    </div>
+                </div>
             </div>
             <p class="subtitle">Trova le combinazioni di volo più convenienti integrando scali intelligenti</p>
         </header>
 
         <!-- Search Form Card -->
         <main>
-            <!-- Dashboard di Stato Connettività -->
-            <section class="status-dashboard-section">
-                <div class="status-dashboard glass">
-                    <div class="status-item" id="status-ryanair">
-                        <span class="status-led led-unknown" id="led-ryanair"></span>
-                        <div class="status-details">
-                            <span class="status-name">Ryanair API</span>
-                            <span class="status-desc" id="ryanair-desc">Inizializzazione...</span>
-                        </div>
-                    </div>
-                    <div class="status-item" id="status-duffel">
-                        <span class="status-led led-unknown" id="led-duffel"></span>
-                        <div class="status-details">
-                            <span class="status-name">Duffel API <span class="mode-badge" id="duffel-mode-badge" style="display: none;"></span></span>
-                            <span class="status-desc" id="duffel-desc">Inizializzazione...</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
 
             <section class="search-section">
                 <div class="search-card glass">
