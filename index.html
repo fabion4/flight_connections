@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1.5">
+    <link rel="stylesheet" href="style.css?v=1.6">
 </head>
 <body>
     <div class="background-glow"></div>
@@ -141,8 +141,23 @@
                     <div id="carrier-chips" class="carrier-chips"></div>
                 </div>
 
-                <!-- Lista Risultati -->
-                <div id="results-list" class="results-list"></div>
+                <!-- Bottone mobile per aprire il pannello rotte -->
+                <button id="route-filter-mobile-btn" class="btn-route-filter-mobile" style="display:none;">☰ Filtra rotte</button>
+
+                <!-- Layout split: pannello sinistro + lista accordion -->
+                <div id="results-layout">
+                    <div id="route-panel" class="glass" style="display:none;">
+                        <div class="route-panel-header">
+                            <span class="route-panel-title">Rotte</span>
+                            <div class="route-panel-actions">
+                                <button id="select-all-routes" class="carrier-action-btn">Tutte</button>
+                                <button id="deselect-all-routes" class="carrier-action-btn">Nessuna</button>
+                            </div>
+                        </div>
+                        <div id="route-panel-list"></div>
+                    </div>
+                    <div id="results-list" class="results-list"></div>
+                </div>
             </section>
 
             <!-- Loading Skeleton / Spinner State -->

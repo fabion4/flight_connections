@@ -113,6 +113,20 @@ document.addEventListener("DOMContentLoaded", () => {
     // Esportazione Excel
     exportBtn.addEventListener("click", handleExport);
 
+    // Mobile: toggle pannello rotte
+    const mobileBtn = document.getElementById("route-filter-mobile-btn");
+    const routePanel = document.getElementById("route-panel");
+    mobileBtn.addEventListener("click", () => {
+        routePanel.classList.toggle("panel-open");
+    });
+    document.addEventListener("click", (e) => {
+        if (routePanel.classList.contains("panel-open") &&
+            !e.target.closest("#route-panel") &&
+            !e.target.closest("#route-filter-mobile-btn")) {
+            routePanel.classList.remove("panel-open");
+        }
+    });
+
     // Filtro compagnie — Seleziona tutto / Deseleziona tutto
     selectAllBtn.addEventListener("click", () => {
         activeCarriers = new Set(getAllCarriers());
@@ -344,6 +358,7 @@ async function loadSystemStatus() {
 // Configurazione della logica di Autocomplete
 function setupAutocomplete(inputEl, dropdownEl, clearBtnEl, setSelectionCallback) {
     let debounceTimer = null;
+    let fetchSeq = 0; // incrementato ad ogni nuova richiesta; le risposte obsolete vengono ignorate
 
     // Evento Input: debounce 300ms poi fetch dinamico
     inputEl.addEventListener("input", () => {
@@ -366,16 +381,18 @@ function setupAutocomplete(inputEl, dropdownEl, clearBtnEl, setSelectionCallback
         // Debounce: aspetta 300ms prima di chiamare il backend
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(async () => {
+            const mySeq = ++fetchSeq;
             try {
                 const response = await fetch(`/api/airports?q=${encodeURIComponent(query)}`);
                 if (!response.ok) throw new Error("Errore fetch aeroporti");
                 const airports = await response.json();
-                // Aggiorna anche la lista globale con i nuovi dati per i helper di rendering
+                if (fetchSeq !== mySeq) return; // risposta obsoleta: scarta
                 airports.forEach(a => {
                     if (!airportsList.find(x => x.code === a.code)) airportsList.push(a);
                 });
                 renderDropdownItems(airports, dropdownEl, inputEl, clearBtnEl, setSelectionCallback);
             } catch (err) {
+                if (fetchSeq !== mySeq) return;
                 console.error(err);
                 dropdownEl.innerHTML = `<div class="dropdown-item" style="cursor:default;opacity:0.6;">Errore nel caricamento</div>`;
             }
@@ -392,16 +409,18 @@ function setupAutocomplete(inputEl, dropdownEl, clearBtnEl, setSelectionCallback
             // Mostra aeroporti popolari (senza query)
             dropdownEl.innerHTML = `<div class="dropdown-item" style="cursor:default;opacity:0.6;">⭐ Aeroporti popolari</div>`;
             showDropdown(dropdownEl);
+            const mySeq = ++fetchSeq;
             try {
                 const response = await fetch("/api/airports");
                 if (!response.ok) throw new Error("Errore fetch aeroporti");
                 const popular = await response.json();
-                // Aggiorna la lista globale
+                if (fetchSeq !== mySeq) return; // l'utente ha già digitato: scarta
                 popular.forEach(a => {
                     if (!airportsList.find(x => x.code === a.code)) airportsList.push(a);
                 });
                 renderDropdownItems(popular, dropdownEl, inputEl, clearBtnEl, setSelectionCallback);
             } catch (err) {
+                if (fetchSeq !== mySeq) return;
                 hideDropdown(dropdownEl);
             }
         }
@@ -693,10 +712,20 @@ function updateFilteredCount() {
     }
 }
 
-/** Applica il filtro corrente e ridisegna la lista */
+/** Applica il filtro corrente in-place (preserva lo stato accordion) */
 function applyCarrierFilter() {
-    const filtered = currentResults.filter(r => routeMatchesFilter(r));
-    renderResults(filtered, /* updateFilter= */ false);
+    resultsList.querySelectorAll(".route-group").forEach(groupEl => {
+        const cards = groupEl.querySelectorAll(".flight-card");
+        let groupVisible = 0;
+        cards.forEach(card => {
+            const matches = card._route && routeMatchesFilter(card._route);
+            card.style.display = matches ? "" : "none";
+            if (matches) groupVisible++;
+        });
+        if (!hiddenRoutes.has(groupEl.dataset.route)) {
+            groupEl.style.display = groupVisible > 0 ? "" : "none";
+        }
+    });
     updateFilteredCount();
 }
 
@@ -709,12 +738,229 @@ function resetCarrierFilter() {
 
 // ────────────────────────────────────────────────────────────────────────────
 
-// Rendering dei Risultati
-// updateFilter=true (default) → ricostruisce il pannello carrier; false → solo aggiorna la lista
-function renderResults(routes, updateFilter = true) {
+// ─── Grouped Results ────────────────────────────────────────────────────────
+
+const hiddenRoutes = new Set();
+
+function groupResults(results) {
+    const groups = {};
+    results.forEach(r => {
+        const key = r.Connection;
+        if (!groups[key]) groups[key] = { key, connections: [], minPrice: Infinity, maxPrice: -Infinity };
+        groups[key].connections.push(r);
+        const p = r["Total Price (€)"];
+        if (p < groups[key].minPrice) groups[key].minPrice = p;
+        if (p > groups[key].maxPrice) groups[key].maxPrice = p;
+    });
+    return Object.values(groups).sort((a, b) => a.minPrice - b.minPrice);
+}
+
+function formatRouteLabel(key) {
+    if (key.includes("(Diretto)")) {
+        const airports = key.replace(" (Diretto)", "").split("-");
+        return `${airports.join(" → ")} <small style="opacity:0.6">(Diretto)</small>`;
+    }
+    if (key.includes("|")) {
+        const [leg1, leg2] = key.split("|").map(s => s.trim());
+        const origin = leg1.split("-")[0].trim();
+        const via = leg1.split("-")[1].trim();
+        const dest = leg2.split("-")[1].trim();
+        return `${origin} → ${via} → ${dest}`;
+    }
+    return key.split("-").join(" → ");
+}
+
+function createFlightCard(route) {
+    const isDirect = route["Connection"].includes("Diretto");
+    const card = document.createElement("div");
+    card.className = `flight-card glass ${isDirect ? "direct" : "connecting"}`;
+    card._route = route;
+
+    const carrier1 = route["First Leg Carrier"] || "Ryanair";
+    const fn1 = route["First Leg Flight Number"] || "-";
+    const carrier2 = route["Second Leg Carrier"] || "-";
+    const fn2 = route["Second Leg Flight Number"] || "-";
+
+    let routeHtml = `
+        <div class="flight-type-badge">${isDirect ? "Diretto" : "Scalo"}</div>
+        <div class="itinerary-details">
+            <div class="flight-segment">
+                <div class="airport-info">
+                    <span class="code">${getAirportCityAndCodeEnriched(route["Connection"].split("-")[0].trim(), route["First Leg Origin City"])}</span>
+                    <span class="carrier-badge">${carrier1} <small>${fn1}</small></span>
+                </div>
+                <div class="segment-line-container">
+                    <span class="duration-label">${route["First Leg Departure"] !== "-" ? "Partenza" : ""}</span>
+                    <div class="flight-line"><span class="plane-indicator">✈️</span></div>
+                </div>
+                <div class="time-info">
+                    <span class="time">🛫 ${formatTime(route["First Leg Departure"])}</span>
+                    <span class="date">${formatDate(route["First Leg Departure"])}</span>
+                </div>
+                <div class="time-info" style="margin-left: 1rem;">
+                    <span class="time">🛬 ${formatTime(route["First Leg Arrival"])}</span>
+                    <span class="date">${formatDate(route["First Leg Arrival"])}</span>
+                </div>
+                <div class="airport-info" style="text-align: right;">
+                    <span class="code">${getAirportCityAndCodeEnriched(route["Connection"].split("-")[1].split("(")[0].split("|")[0].trim(), route["First Leg Destination City"])}</span>
+                </div>
+            </div>
+    `;
+
+    if (!isDirect) {
+        const layoverHours = route["Layover (h)"];
+        const layoverAirport = route["Connection"].split("|")[0].split("-")[1].trim();
+        routeHtml += `
+            <div class="layover-bar">
+                <span>🕒 Scalo a <strong>${getAirportCityEnriched(layoverAirport, route["First Leg Destination City"])} (${layoverAirport})</strong> per <strong>${layoverHours} ore</strong></span>
+            </div>
+            <div class="flight-segment">
+                <div class="airport-info">
+                    <span class="code">${getAirportCityAndCodeEnriched(layoverAirport, route["Second Leg Origin City"])}</span>
+                    <span class="carrier-badge">${carrier2} <small>${fn2}</small></span>
+                </div>
+                <div class="segment-line-container">
+                    <span class="duration-label">Coincidenza</span>
+                    <div class="flight-line"><span class="plane-indicator">✈️</span></div>
+                </div>
+                <div class="time-info">
+                    <span class="time">🛫 ${formatTime(route["Second Leg Departure"])}</span>
+                    <span class="date">${formatDate(route["Second Leg Departure"])}</span>
+                </div>
+                <div class="time-info" style="margin-left: 1rem;">
+                    <span class="time">🛬 ${formatTime(route["Second Leg Arrival"])}</span>
+                    <span class="date">${formatDate(route["Second Leg Arrival"])}</span>
+                </div>
+                <div class="airport-info" style="text-align: right;">
+                    <span class="code">${getAirportCityAndCodeEnriched(route["Connection"].split("|")[1].split("-")[1].trim(), route["Second Leg Destination City"])}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    routeHtml += `
+        </div>
+        <div class="price-container">
+            <span class="price">€${route["Total Price (€)"].toFixed(2)}</span>
+            <span class="price-subtitle">Totale tasse incluse</span>
+            <span class="duration-label" style="margin-top:0.25rem;">Durata totale: ${route["Total Duration (h)"]}h</span>
+        </div>
+    `;
+    card.innerHTML = routeHtml;
+    return card;
+}
+
+function renderRoutePanel(groups) {
+    const panelEl = document.getElementById("route-panel");
+    const panelList = document.getElementById("route-panel-list");
+    const mobileBtn = document.getElementById("route-filter-mobile-btn");
+
+    panelList.innerHTML = "";
+    hiddenRoutes.clear();
+
+    if (groups.length <= 1) {
+        panelEl.style.display = "none";
+        mobileBtn.style.display = "none";
+        return;
+    }
+
+    groups.forEach(group => {
+        const priceRange = group.minPrice === group.maxPrice
+            ? `€${group.minPrice.toFixed(2)}`
+            : `€${group.minPrice.toFixed(2)} – €${group.maxPrice.toFixed(2)}`;
+
+        const row = document.createElement("div");
+        row.className = "panel-route-row";
+        row.dataset.route = group.key;
+        row.innerHTML = `
+            <input type="checkbox" class="route-checkbox" checked data-route="${group.key}">
+            <div class="panel-route-info">
+                <span class="panel-route-label">${formatRouteLabel(group.key)}</span>
+                <span class="panel-route-meta">${priceRange} (${group.connections.length})</span>
+            </div>
+        `;
+
+        const checkbox = row.querySelector(".route-checkbox");
+        checkbox.addEventListener("change", () => {
+            const sel = `.route-group[data-route="${CSS.escape(group.key)}"]`;
+            const groupEl = resultsList.querySelector(sel);
+            if (checkbox.checked) {
+                hiddenRoutes.delete(group.key);
+                if (groupEl) groupEl.style.display = "";
+            } else {
+                hiddenRoutes.add(group.key);
+                if (groupEl) groupEl.style.display = "none";
+            }
+        });
+
+        row.querySelector(".panel-route-info").addEventListener("click", () => {
+            const sel = `.route-group[data-route="${CSS.escape(group.key)}"]`;
+            const groupEl = resultsList.querySelector(sel);
+            if (groupEl) {
+                if (!groupEl.classList.contains("expanded")) groupEl.classList.add("expanded");
+                groupEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        });
+
+        panelList.appendChild(row);
+    });
+
+    document.getElementById("select-all-routes").onclick = () => {
+        hiddenRoutes.clear();
+        panelList.querySelectorAll(".route-checkbox").forEach(cb => { cb.checked = true; });
+        resultsList.querySelectorAll(".route-group").forEach(g => { g.style.display = ""; });
+    };
+    document.getElementById("deselect-all-routes").onclick = () => {
+        groups.forEach(g => hiddenRoutes.add(g.key));
+        panelList.querySelectorAll(".route-checkbox").forEach(cb => { cb.checked = false; });
+        resultsList.querySelectorAll(".route-group").forEach(g => { g.style.display = "none"; });
+    };
+
+    panelEl.style.display = "block";
+    // mobile btn shown/hidden via CSS media query
+    mobileBtn.style.display = "";
+}
+
+function renderGroupedResults(groups) {
     resultsList.innerHTML = "";
-    
-    // Aggiorna le statistiche in alto
+    groups.forEach(group => {
+        const priceRange = group.minPrice === group.maxPrice
+            ? `€${group.minPrice.toFixed(2)}`
+            : `€${group.minPrice.toFixed(2)} – €${group.maxPrice.toFixed(2)}`;
+
+        const groupEl = document.createElement("div");
+        groupEl.className = "route-group";
+        groupEl.dataset.route = group.key;
+        if (hiddenRoutes.has(group.key)) groupEl.style.display = "none";
+
+        const header = document.createElement("div");
+        header.className = "route-group-header glass";
+        header.innerHTML = `
+            <div class="route-group-title">
+                <span class="route-arrow">▶</span>
+                <span class="route-label">${formatRouteLabel(group.key)}</span>
+            </div>
+            <div class="route-group-meta">
+                <span class="route-options">${group.connections.length} opzion${group.connections.length === 1 ? "e" : "i"}</span>
+                <span class="route-price-range">da ${priceRange.split(" – ")[0]}</span>
+            </div>
+        `;
+
+        const body = document.createElement("div");
+        body.className = "route-group-body";
+        group.connections.forEach(route => body.appendChild(createFlightCard(route)));
+
+        header.addEventListener("click", () => groupEl.classList.toggle("expanded"));
+
+        groupEl.appendChild(header);
+        groupEl.appendChild(body);
+        resultsList.appendChild(groupEl);
+    });
+}
+
+// Rendering dei Risultati
+// updateFilter=true (default) → ricostruisce il pannello carrier; false → solo filtra in-place
+function renderResults(routes, updateFilter = true) {
     resultsCount.textContent = `Trovate ${routes.length} connession${routes.length === 1 ? "e" : "i"}`;
     if (routes.length > 0) {
         const bestPrice = routes[0]["Total Price (€)"];
@@ -723,105 +969,11 @@ function renderResults(routes, updateFilter = true) {
         bestPriceSpan.textContent = "Miglior prezzo: €-";
     }
 
-    // Costruisce/aggiorna il pannello filtro SOLO al primo render (non durante i re-render da filtro)
-    if (updateFilter) {
-        buildCarrierFilter();
-    }
+    if (updateFilter) buildCarrierFilter();
 
-
-    routes.forEach(route => {
-        const isDirect = route["Connection"].includes("Diretto");
-        const card = document.createElement("div");
-        card.className = `flight-card glass ${isDirect ? "direct" : "connecting"}`;
-
-        // Estraiamo i dettagli delle compagnie e numeri di volo
-        const carrier1 = route["First Leg Carrier"] || "Ryanair";
-        const fn1 = route["First Leg Flight Number"] || "-";
-        
-        const carrier2 = route["Second Leg Carrier"] || "-";
-        const fn2 = route["Second Leg Flight Number"] || "-";
-
-        // Costruiamo il layout HTML per ciascun volo
-        let routeHtml = `
-            <div class="flight-type-badge">${isDirect ? "Diretto" : "Scalo"}</div>
-            <div class="itinerary-details">
-                <!-- Primo Volo (o Volo Diretto) -->
-                <div class="flight-segment">
-                    <div class="airport-info">
-                        <span class="code">${getAirportCityAndCodeEnriched(route["Connection"].split("-")[0].trim(), route["First Leg Origin City"])}</span>
-                        <span class="carrier-badge">${carrier1} <small>${fn1}</small></span>
-                    </div>
-                    <div class="segment-line-container">
-                        <span class="duration-label">${route["First Leg Departure"] !== "-" ? "Partenza" : ""}</span>
-                        <div class="flight-line">
-                            <span class="plane-indicator">✈️</span>
-                        </div>
-                    </div>
-                    <div class="time-info">
-                        <span class="time">🛫 ${formatTime(route["First Leg Departure"])}</span>
-                        <span class="date">${formatDate(route["First Leg Departure"])}</span>
-                    </div>
-                    <div class="time-info" style="margin-left: 1rem;">
-                        <span class="time">🛬 ${formatTime(route["First Leg Arrival"])}</span>
-                        <span class="date">${formatDate(route["First Leg Arrival"])}</span>
-                    </div>
-                    <div class="airport-info" style="text-align: right;">
-                        <span class="code">${getAirportCityAndCodeEnriched(route["Connection"].split("-")[1].split("(")[0].split("|")[0].trim(), route["First Leg Destination City"])}</span>
-                    </div>
-                </div>
-        `;
-
-        // Se c'è uno scalo, aggiungiamo la barra informativa dello scalo e il secondo volo
-        if (!isDirect) {
-            const layoverHours = route["Layover (h)"];
-            const layoverAirport = route["Connection"].split("|")[0].split("-")[1].trim();
-
-            routeHtml += `
-                <!-- Barra Scalo -->
-                <div class="layover-bar">
-                    <span>🕒 Scalo a <strong>${getAirportCityEnriched(layoverAirport, route["First Leg Destination City"])} (${layoverAirport})</strong> per <strong>${layoverHours} ore</strong></span>
-                </div>
-
-                <!-- Secondo Volo -->
-                <div class="flight-segment">
-                    <div class="airport-info">
-                        <span class="code">${getAirportCityAndCodeEnriched(layoverAirport, route["Second Leg Origin City"])}</span>
-                        <span class="carrier-badge">${carrier2} <small>${fn2}</small></span>
-                    </div>
-                    <div class="segment-line-container">
-                        <span class="duration-label">Coincidenza</span>
-                        <div class="flight-line">
-                            <span class="plane-indicator">✈️</span>
-                        </div>
-                    </div>
-                    <div class="time-info">
-                        <span class="time">🛫 ${formatTime(route["Second Leg Departure"])}</span>
-                        <span class="date">${formatDate(route["Second Leg Departure"])}</span>
-                    </div>
-                    <div class="time-info" style="margin-left: 1rem;">
-                        <span class="time">🛬 ${formatTime(route["Second Leg Arrival"])}</span>
-                        <span class="date">${formatDate(route["Second Leg Arrival"])}</span>
-                    </div>
-                    <div class="airport-info" style="text-align: right;">
-                        <span class="code">${getAirportCityAndCodeEnriched(route["Connection"].split("|")[1].split("-")[1].trim(), route["Second Leg Destination City"])}</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Chiusura tag itinerario e container prezzi
-        routeHtml += `
-            </div>
-            <div class="price-container">
-                <span class="price">€${route["Total Price (€)"].toFixed(2)}</span>
-                <span class="price-subtitle">Totale tasse incluse</span>
-                <span class="duration-label" style="margin-top:0.25rem;">Durata totale: ${route["Total Duration (h)"]}h</span>
-            </div>
-        `;
-
-        card.innerHTML = routeHtml;
-        resultsList.appendChild(card);
-    });
+    const groups = groupResults(routes);
+    renderRoutePanel(groups);
+    renderGroupedResults(groups);
 
     resultsSection.style.display = "block";
 }
