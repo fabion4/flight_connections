@@ -17,11 +17,13 @@ try:
     from api.providers.duffel import DuffelProvider
     from api.router import find_connections
     from api.utils import save_to_excel_in_memory
+    from api.city_groups import CITY_GROUPS, METRO_GROUPS, AIRPORT_TO_METRO
 except ImportError:
     from providers.ryanair import RyanairProvider, get_airports
     from providers.duffel import DuffelProvider
     from router import find_connections
     from utils import save_to_excel_in_memory
+    from city_groups import CITY_GROUPS, METRO_GROUPS, AIRPORT_TO_METRO
 
 app = FastAPI(title="Flight Connection API", description="API per la ricerca di voli e connessioni Ryanair e Duffel")
 
@@ -146,12 +148,13 @@ def read_airports(q: Optional[str] = Query(None, description="Query di ricerca a
             if res.status_code == 200:
                 data = res.json().get("data", [])
                 for place in data:
-                    # Duffel restituisce sia airports che cities; filtriamo solo airports
-                    if place.get("type") == "airport" and place.get("iata_code"):
+                    iata = place.get("iata_code", "")
+                    # Escludiamo city/metro codes (es. RMA, LON) che non sono aeroporti reali
+                    if place.get("type") == "airport" and iata and iata not in CITY_GROUPS:
                         duffel_results.append({
-                            "code": place["iata_code"],
-                            "name": place.get("name", place["iata_code"]),
-                            "city": place.get("city_name", place.get("name", place["iata_code"])),
+                            "code": iata,
+                            "name": place.get("name", iata),
+                            "city": place.get("city_name", place.get("name", iata)),
                             "country": place.get("country_name", "")
                         })
         except Exception:
@@ -159,19 +162,46 @@ def read_airports(q: Optional[str] = Query(None, description="Query di ricerca a
 
     # --- 5. Unione con deduplicazione per codice IATA ---
     seen_codes = set()
-    combined = []
-    # Prima i risultati Ryanair (hanno priorità)
+    flat = []
     for a in ryanair_filtered:
         if a["code"] not in seen_codes:
             seen_codes.add(a["code"])
-            combined.append(a)
-    # Poi Duffel
+            flat.append(a)
     for a in duffel_results:
         if a["code"] not in seen_codes:
             seen_codes.add(a["code"])
-            combined.append(a)
+            flat.append(a)
 
-    return combined[:20]  # Limita a 20 risultati per leggibilità del dropdown
+    # --- 6. Raggruppa aeroporti dello stesso metro in sottoalbero ---
+    result = []
+    added_codes = set()
+    added_metros = set()
+
+    for a in flat:
+        metro = AIRPORT_TO_METRO.get(a["code"])
+        if metro and metro not in added_metros:
+            # Inserisce prima l'header del gruppo
+            info = METRO_GROUPS[metro]
+            result.append({
+                "code": metro,
+                "name": info["label"],
+                "city": info["city"],
+                "country": info["country"],
+                "group": info["airports"]
+            })
+            added_metros.add(metro)
+            # Inserisce subito dopo tutti gli aeroporti del gruppo presenti in flat
+            for child_code in info["airports"]:
+                child = next((x for x in flat if x["code"] == child_code), None)
+                if child and child_code not in added_codes:
+                    child["parent_group"] = metro
+                    result.append(child)
+                    added_codes.add(child_code)
+        elif a["code"] not in added_codes:
+            result.append(a)
+            added_codes.add(a["code"])
+
+    return result[:25]  # Limite leggermente più alto per accomodare gli header gruppo
 
 def _generate_monthly_dates(start_date: str, end_date: str) -> list[str]:
     from datetime import datetime

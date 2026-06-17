@@ -428,15 +428,37 @@ function renderDropdownItems(items, dropdownEl, inputEl, clearBtnEl, setSelectio
 
     items.forEach(airport => {
         const div = document.createElement("div");
-        div.className = "dropdown-item";
-        div.innerHTML = `
-            <div class="airport-name">${airport.city} (${airport.name})</div>
-            <div class="airport-code">${airport.code}</div>
-        `;
+        const isGroup = Array.isArray(airport.group);
+        const isChild = !!airport.parent_group;
+
+        if (isGroup) {
+            div.className = "dropdown-item dropdown-group-header";
+            div.innerHTML = `
+                <div class="airport-name">🏙️ ${airport.name}</div>
+                <div class="airport-code">${airport.code}</div>
+            `;
+        } else if (isChild) {
+            div.className = "dropdown-item dropdown-child-item";
+            div.innerHTML = `
+                <div class="airport-name">${airport.name}</div>
+                <div class="airport-code">${airport.code}</div>
+            `;
+        } else {
+            div.className = "dropdown-item";
+            div.innerHTML = `
+                <div class="airport-name">${airport.city} (${airport.name})</div>
+                <div class="airport-code">${airport.code}</div>
+            `;
+        }
+
+        const label = isGroup
+            ? `${airport.city} — tutti gli aeroporti (${airport.code})`
+            : `${airport.city} (${airport.code})`;
+
         const selectItem = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            inputEl.value = `${airport.city} (${airport.code})`;
+            inputEl.value = label;
             clearBtnEl.style.display = "block";
             setSelectionCallback(airport.code);
             hideDropdown(dropdownEl);

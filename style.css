@@ -256,6 +256,33 @@ header .subtitle {
     color: var(--accent-indigo);
 }
 
+/* Dropdown aeroporti — gruppo metropolitano */
+.dropdown-group-header {
+    background: rgba(99, 102, 241, 0.12);
+    border-left: 3px solid var(--accent-indigo);
+    font-weight: 600;
+}
+
+.dropdown-group-header:hover {
+    background: rgba(99, 102, 241, 0.25);
+}
+
+.dropdown-group-header .airport-code {
+    background: rgba(99, 102, 241, 0.3);
+    color: #a5b4fc;
+}
+
+/* Aeroporto figlio — indentato */
+.dropdown-child-item {
+    padding-left: 1.8rem;
+    font-size: 0.85rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dropdown-child-item .airport-name {
+    color: rgba(255, 255, 255, 0.8);
+}
+
 /* Stili Calendario Custom */
 .calendar-dropdown {
     position: absolute;
