@@ -839,12 +839,14 @@ header .subtitle {
 
     .header-top {
         flex-direction: column;
-        gap: 0.6rem;
+        align-items: center;
+        gap: 0.5rem;
     }
 
     .header-api-status {
         position: static;
         transform: none;
+        justify-content: center;
     }
     
     .flight-card {
