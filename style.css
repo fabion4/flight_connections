@@ -1221,6 +1221,45 @@ header .subtitle {
     transition: width 0.3s ease;
 }
 
+/* Loader compatto: si sposta in basso a destra mentre i risultati sono già visibili */
+.loader-compact {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    left: auto;
+    width: auto;
+    padding: 0.75rem 1.1rem;
+    border-radius: 14px;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    background: rgba(17, 21, 32, 0.95);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    z-index: 150;
+}
+
+.loader-compact .spinner {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+}
+
+.loader-compact #loader-text {
+    display: none;
+}
+
+.loader-compact .progress-bar-container {
+    width: 110px;
+    margin: 0;
+}
+
+.loader-compact #loader-progress-text {
+    font-size: 0.75rem;
+    margin: 0;
+    white-space: nowrap;
+}
+
 /* ─── Grouped Results: layout split ────────────────────────────────────────── */
 
 #results-layout {

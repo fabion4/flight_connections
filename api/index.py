@@ -262,7 +262,15 @@ def search_flights(
             connections_ryanair = find_connections(RyanairProvider(), start, end, dates_ryanair, max_layover_days * 24, filter_start=start_date, filter_end=end_date)
             print(f"[Search Stream] Ryanair ha completato con {len(connections_ryanair)} combinazioni.")
             yield json.dumps({"type": "progress", "percent": 20, "message": f"Ryanair completato. Trovate {len(connections_ryanair)} rotte."}) + "\n"
-            
+
+            # Invia subito i risultati Ryanair mentre Duffel parte
+            if connections_ryanair:
+                partial_records = sorted(
+                    [c.to_dict() for c in connections_ryanair],
+                    key=lambda r: r["Total Price (€)"]
+                )
+                yield json.dumps({"type": "partial_results", "data": partial_records}) + "\n"
+
             # 2. Ricerca Duffel con coda sincronizzata
             q = queue.Queue()
             dates_duffel = _generate_daily_dates(start_date, end_date)

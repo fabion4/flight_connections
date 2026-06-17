@@ -573,6 +573,10 @@ async function handleSearch() {
                         if (parsed.type === "progress") {
                             if (progressBarFill) progressBarFill.style.width = parsed.percent + "%";
                             if (loaderProgressText) loaderProgressText.textContent = `${parsed.message} (${parsed.percent}%)`;
+                        } else if (parsed.type === "partial_results") {
+                            currentResults = parsed.data;
+                            renderResults(parsed.data, false);
+                            loaderState.classList.add("loader-compact");
                         } else if (parsed.type === "results") {
                             results = parsed.data;
                         } else if (parsed.type === "error") {
@@ -585,7 +589,8 @@ async function handleSearch() {
             }
         }
 
-        currentResults = results; // Salviamo per esportazione
+        loaderState.classList.remove("loader-compact");
+        currentResults = results;
 
         if (results.length === 0) {
             showSystemError("Nessuna connessione trovata ❌", "Non ci sono voli diretti o con scalo disponibili tra questi due aeroporti per la data inserita.");
@@ -594,9 +599,9 @@ async function handleSearch() {
         }
     } catch (err) {
         console.error(err);
+        loaderState.classList.remove("loader-compact");
         showSystemError("Errore durante la ricerca ❌", err.message || "Si è verificato un errore nel comunicare con il server. Riprova più tardi.");
     } finally {
-        // Ripristina pulsante e stato loader
         searchBtn.disabled = false;
         searchBtn.querySelector(".btn-text").textContent = "Cerca Connessioni";
         searchBtn.querySelector(".btn-loader").style.display = "none";
