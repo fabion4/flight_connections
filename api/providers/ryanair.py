@@ -28,6 +28,8 @@ def parse_datetime(date_str):
 class RyanairProvider(FlightProvider):
     def __init__(self):
         self._airport_lookup = None
+        self._destinations_cache: dict[str, list[str]] = {}
+        self._flights_cache: dict[tuple, list[FlightLeg]] = {}
 
     @property
     def airport_lookup(self) -> dict[str, str]:
@@ -43,30 +45,35 @@ class RyanairProvider(FlightProvider):
         return self._airport_lookup
 
     def get_destinations(self, airport_code: str) -> list[str]:
+        if airport_code in self._destinations_cache:
+            return self._destinations_cache[airport_code]
         url = f"https://www.ryanair.com/api/views/locate/searchWidget/routes/en/airport/{airport_code}"
         try:
             response = requests.get(url, verify=False, timeout=15)
             if response.status_code == 200:
-                data = response.json()
-                return [route["arrivalAirport"]["code"] for route in data]
+                result = [route["arrivalAirport"]["code"] for route in response.json()]
+                self._destinations_cache[airport_code] = result
+                return result
         except Exception:
             pass
+        self._destinations_cache[airport_code] = []
         return []
 
     def get_flights(self, from_code: str, to_code: str, date_str: str) -> list[FlightLeg]:
+        key = (from_code, to_code, date_str)
+        if key in self._flights_cache:
+            return self._flights_cache[key]
         url = f"https://www.ryanair.com/api/farfnd/v4/oneWayFares/{from_code}/{to_code}/cheapestPerDay?outboundMonthOfDate={date_str}&currency=EUR"
         try:
             response = requests.get(url, verify=False, timeout=15)
             if response.status_code == 200:
                 flights = response.json().get("outbound", {}).get("fares", [])
-                
                 results = []
                 for f in flights:
                     if f.get("unavailable", False):
                         continue
                     price_val = f["price"]["value"] if f.get("price") else 0.0
                     flight_num = f.get("flightNumber", f"FR{price_val*100:.0f}" if price_val else "FR999")
-                    
                     results.append(
                         FlightLeg(
                             from_code=from_code,
@@ -80,7 +87,9 @@ class RyanairProvider(FlightProvider):
                             flight_number=flight_num
                         )
                     )
+                self._flights_cache[key] = results
                 return results
         except Exception:
             pass
+        self._flights_cache[key] = []
         return []

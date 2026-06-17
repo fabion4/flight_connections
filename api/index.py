@@ -254,46 +254,52 @@ def search_flights(
         try:
             print(f"\n[Search Stream] Richiesta ricevuta: {start} -> {end} dal {start_date} al {end_date} (Max scalo: {max_layover_days}gg)")
             
-            # 1. Inizio e ricerca Ryanair
+            # 1. Ricerca Ryanair (istanza unica — dati cached per la chiamata combinata finale)
             yield json.dumps({"type": "progress", "percent": 5, "message": "Inizializzazione ricerca..."}) + "\n"
             yield json.dumps({"type": "progress", "percent": 10, "message": "Ricerca connessioni Ryanair in corso..."}) + "\n"
-            
+
             dates_ryanair = _generate_monthly_dates(start_date, end_date)
-            connections_ryanair = find_connections(RyanairProvider(), start, end, dates_ryanair, max_layover_days * 24, filter_start=start_date, filter_end=end_date)
+            ryanair_provider = RyanairProvider()
+            connections_ryanair = find_connections(
+                [(ryanair_provider, dates_ryanair)],
+                start, end, max_layover_days * 24,
+                filter_start=start_date, filter_end=end_date
+            )
             print(f"[Search Stream] Ryanair ha completato con {len(connections_ryanair)} combinazioni.")
             yield json.dumps({"type": "progress", "percent": 20, "message": f"Ryanair completato. Trovate {len(connections_ryanair)} rotte."}) + "\n"
 
             # Invia subito i risultati Ryanair mentre Duffel parte
             if connections_ryanair:
-                partial_records = sorted(
-                    [c.to_dict() for c in connections_ryanair],
-                    key=lambda r: r["Total Price (€)"]
-                )
+                partial_records = [c.to_dict() for c in connections_ryanair]
                 yield json.dumps({"type": "partial_results", "data": partial_records}) + "\n"
 
-            # 2. Ricerca Duffel con coda sincronizzata
+            # 2. Ricerca Duffel con coda sincronizzata — salva riferimento al provider per la chiamata combinata
             q = queue.Queue()
             dates_duffel = _generate_daily_dates(start_date, end_date)
-            connections_duffel_container = []
-            
+            duffel_provider_ref = []
+
             def duffel_progress_callback(percent, message):
                 q.put({"type": "progress", "percent": percent, "message": message})
-                
+
             def run_duffel_thread():
                 try:
                     provider = DuffelProvider(start, end, dates_duffel, progress_callback=duffel_progress_callback)
-                    conns = find_connections(provider, start, end, dates_duffel, max_layover_days * 24, filter_start=start_date, filter_end=end_date)
-                    connections_duffel_container.append(conns)
+                    # Esegue la ricerca Duffel-only per popolare il cache interno del provider
+                    find_connections(
+                        [(provider, dates_duffel)],
+                        start, end, max_layover_days * 24,
+                        filter_start=start_date, filter_end=end_date
+                    )
+                    duffel_provider_ref.append(provider)
                 except Exception as ex:
                     print(f"[Search Stream] Errore Duffel thread: {ex}")
                     q.put({"type": "error", "message": str(ex)})
                 finally:
-                    q.put(None) # Segnale di fine coda
-                    
+                    q.put(None)
+
             t = threading.Thread(target=run_duffel_thread)
             t.start()
-            
-            # Consuma la coda e invia i progressi in tempo reale
+
             while True:
                 item = q.get()
                 if item is None:
@@ -302,18 +308,26 @@ def search_flights(
                     yield json.dumps({"type": "progress", "percent": 90, "message": f"Duffel non disponibile: {item['message']}"}) + "\n"
                 else:
                     yield json.dumps(item) + "\n"
-                    
+
             t.join()
-            
-            connections_duffel = connections_duffel_container[0] if connections_duffel_container else []
-            print(f"[Search Stream] Duffel ha completato con {len(connections_duffel)} combinazioni.")
-            
-            # 3. Fusione e ordinamento dei dati
-            yield json.dumps({"type": "progress", "percent": 96, "message": "Unione e ordinamento risultati..."}) + "\n"
-            
-            combined_connections = sorted(connections_ryanair + connections_duffel, key=lambda c: c.total_price)
+
+            # 3. Ricerca combinata cross-provider (entrambi i provider usano il proprio cache — nessuna nuova HTTP)
+            yield json.dumps({"type": "progress", "percent": 96, "message": "Ricerca connessioni cross-provider..."}) + "\n"
+
+            providers_for_combined = [(ryanair_provider, dates_ryanair)]
+            if duffel_provider_ref:
+                providers_for_combined.append((duffel_provider_ref[0], dates_duffel))
+                print(f"[Search Stream] Avvio ricerca combinata con {len(providers_for_combined)} provider.")
+            else:
+                print("[Search Stream] Duffel non disponibile — risultati solo Ryanair.")
+
+            combined_connections = find_connections(
+                providers_for_combined,
+                start, end, max_layover_days * 24,
+                filter_start=start_date, filter_end=end_date
+            )
             records = [c.to_dict() for c in combined_connections]
-                
+
             yield json.dumps({"type": "progress", "percent": 100, "message": "Fatto!"}) + "\n"
             yield json.dumps({"type": "results", "data": records}) + "\n"
             print(f"[Search Stream] Risultati totali inviati: {len(records)}\n")

@@ -5,66 +5,63 @@ from api.providers.base import FlightProvider
 from api.city_groups import expand_airport
 
 def find_connections(
-    provider: FlightProvider,
+    providers_with_dates: list[tuple],  # [(FlightProvider, list[str]), ...]
     start_airport: str,
     end_airport: str,
-    dates: list[str],
     max_layover_h: float,
     use_city_groups: bool = True,
     filter_start: str = None,
     filter_end: str = None,
 ) -> list[Connection]:
     """
-    Algoritmo di routing condiviso tra i diversi provider di voli.
-    Trova voli diretti e connessioni con 1 scalo intermedio.
+    Algoritmo di routing multi-provider api-agnostic.
+    Trova voli diretti e connessioni con 1 scalo usando tutti i provider forniti.
+    Le connessioni cross-provider (leg1 da provider A, leg2 da provider B) sono incluse.
 
-    dates: date usate per interrogare il provider (es. primo del mese per Ryanair, giornaliere per Duffel)
-    filter_start/filter_end: range reale richiesto dall'utente per filtrare i voli restituiti
+    providers_with_dates: lista di (provider, dates) — ogni provider usa le proprie date
+    filter_start/filter_end: range reale richiesto dall'utente per filtrare i voli
     """
     if filter_start and filter_end:
-        from datetime import date as date_type
         _filter_start = datetime.strptime(filter_start, "%Y-%m-%d").date()
         _filter_end = datetime.strptime(filter_end, "%Y-%m-%d").date()
         def in_range(dt: datetime) -> bool:
             return _filter_start <= dt.date() <= _filter_end
     else:
-        valid_dates = set(dates)
+        all_dates = {d for _, dates in providers_with_dates for d in dates}
         def in_range(dt: datetime) -> bool:
-            return dt.strftime("%Y-%m-%d") in valid_dates
-    
-    # 1. Espandi gli aeroporti
+            return dt.strftime("%Y-%m-%d") in all_dates
+
     start_expanded = expand_airport(start_airport) if use_city_groups else [start_airport]
     end_expanded = expand_airport(end_airport) if use_city_groups else [end_airport]
-    
-    # 2. Calcola destinazioni raggiungibili da start
+
+    # 1. Unione destinazioni da tutti i provider
     reachable_from_start = set()
     for start_apt in start_expanded:
-        reachable_from_start.update(provider.get_destinations(start_apt))
-        
-    # 3. Calcola origini che raggiungono end
+        for provider, _ in providers_with_dates:
+            reachable_from_start.update(provider.get_destinations(start_apt))
+
     reachable_to_end = set()
     for end_apt in end_expanded:
-        reachable_to_end.update(provider.get_destinations(end_apt))
-        
-    # 4. Intersezione per trovare candidati di scalo
+        for provider, _ in providers_with_dates:
+            reachable_to_end.update(provider.get_destinations(end_apt))
+
     via_candidates = reachable_from_start & reachable_to_end
-    
+
     connections = []
-    
-    # 5. Cerca connessioni con scalo per ciascun via_airport
+
+    # 2. Connessioni con scalo — voli da tutti i provider per ogni via_airport
     for via_airport in via_candidates:
         first_legs = []
         second_legs = []
-        for date in dates:
-            for start_apt in start_expanded:
-                first_legs.extend(provider.get_flights(start_apt, via_airport, date))
-            for end_apt in end_expanded:
-                second_legs.extend(provider.get_flights(via_airport, end_apt, date))
-                
-        # Filtra i primi voli solo per le date richieste
+        for provider, dates in providers_with_dates:
+            for date in dates:
+                for start_apt in start_expanded:
+                    first_legs.extend(provider.get_flights(start_apt, via_airport, date))
+                for end_apt in end_expanded:
+                    second_legs.extend(provider.get_flights(via_airport, end_apt, date))
+
         first_legs = [f for f in first_legs if in_range(f.departure)]
-        
-        # Deduplica le tratte per evitare duplicati causati dalle risposte cumulative dei provider (es. Ryanair mensile)
+
         seen_first = set()
         dedup_first = []
         for f in first_legs:
@@ -72,7 +69,7 @@ def find_connections(
             if key not in seen_first:
                 seen_first.add(key)
                 dedup_first.append(f)
-                
+
         seen_second = set()
         dedup_second = []
         for f in second_legs:
@@ -80,12 +77,11 @@ def find_connections(
             if key not in seen_second:
                 seen_second.add(key)
                 dedup_second.append(f)
-                
+
         for f1, f2 in product(dedup_first, dedup_second):
             layover_time = (f2.departure - f1.arrival).total_seconds() / 3600
             if 0 < layover_time <= max_layover_h:
                 total_duration = (f2.arrival - f1.departure).total_seconds() / 3600
-                total_price = f1.price + f2.price
                 connections.append(
                     Connection(
                         connection_label=f"{f1.from_code}-{f1.to_code} | {f2.from_code}-{f2.to_code}",
@@ -93,29 +89,29 @@ def find_connections(
                         second_leg=f2,
                         layover_h=round(layover_time, 1),
                         total_duration_h=round(total_duration, 1),
-                        total_price=total_price
+                        total_price=f1.price + f2.price
                     )
                 )
-                
-    # 6. Cerca voli diretti
-    for date in dates:
-        for start_apt in start_expanded:
-            for end_apt in end_expanded:
-                flights = provider.get_flights(start_apt, end_apt, date)
-                for f in flights:
-                    if in_range(f.departure):
-                        duration_h = (f.arrival - f.departure).total_seconds() / 3600
-                        connections.append(
-                            Connection(
-                                connection_label=f"{f.from_code}-{f.to_code} (Diretto)",
-                                first_leg=f,
-                                second_leg=None,
-                                layover_h=0.0,
-                                total_duration_h=round(duration_h, 1),
-                                total_price=f.price
+
+    # 3. Voli diretti da tutti i provider
+    for provider, dates in providers_with_dates:
+        for date in dates:
+            for start_apt in start_expanded:
+                for end_apt in end_expanded:
+                    flights = provider.get_flights(start_apt, end_apt, date)
+                    for f in flights:
+                        if in_range(f.departure):
+                            duration_h = (f.arrival - f.departure).total_seconds() / 3600
+                            connections.append(
+                                Connection(
+                                    connection_label=f"{f.from_code}-{f.to_code} (Diretto)",
+                                    first_leg=f,
+                                    second_leg=None,
+                                    layover_h=0.0,
+                                    total_duration_h=round(duration_h, 1),
+                                    total_price=f.price
+                                )
                             )
-                        )
-                        
-    # 7. Ordina per prezzo totale crescente
+
     connections.sort(key=lambda c: c.total_price)
     return connections

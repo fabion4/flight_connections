@@ -138,7 +138,7 @@ def test_get_destinations_router_integration_2segment():
         ("CAG", "BCN", "2026-06-17"): [leg1],
         ("BCN", "MUC", "2026-06-17"): [leg2],
     }
-    res = find_connections(provider, "CAG", "MUC", ["2026-06-17"], max_layover_h=120.0,
+    res = find_connections([(provider, ["2026-06-17"])], "CAG", "MUC", max_layover_h=120.0,
                            use_city_groups=False, filter_start="2026-06-17", filter_end="2026-06-17")
     assert len(res) == 1
     assert res[0].connection_label == "CAG-BCN | BCN-MUC"
